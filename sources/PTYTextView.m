@@ -45,6 +45,7 @@
 #import "iTermWarning.h"
 #import "MovePaneController.h"
 #import "MovingAverage.h"
+#import "MTPerfMetrics.h"
 #import "NSAppearance+iTerm.h"
 #import "NSArray+iTerm.h"
 #import "NSCharacterSet+iTerm.h"
@@ -1045,10 +1046,20 @@ const CGFloat PTYTextViewMarginClickGraceWidth = 2.0;
 #pragma mark Set Needs Display Helpers
 
 - (void)setNeedsDisplayOnLine:(int)line {
+    // End latency measurements for user interactions that result in a refresh
+    MTPerfEnd(MTPerfMetricMouseClick);
+    MTPerfEnd(MTPerfMetricTabSwitch);
+    MTPerfEnd(MTPerfMetricWindowFocus);
+    MTPerfEnd(MTPerfMetricPostJoinedRefresh);
     [self requestDelegateRedraw];
 }
 
 - (void)setNeedsDisplayOnLine:(int)y inRange:(VT100GridRange)range {
+    // End latency measurements for user interactions that result in a refresh
+    MTPerfEnd(MTPerfMetricMouseClick);
+    MTPerfEnd(MTPerfMetricTabSwitch);
+    MTPerfEnd(MTPerfMetricWindowFocus);
+    MTPerfEnd(MTPerfMetricPostJoinedRefresh);
     [self requestDelegateRedraw];
 }
 
@@ -1118,10 +1129,11 @@ static NSString *iTermStringForEventPhase(NSEventPhase eventPhase) {
 }
 
 - (void)mouseDown:(NSEvent *)event {
+    MTPerfStart(MTPerfMetricMouseClick);
     [_selectCommandTimer invalidate];
     [_selectCommandTimer release];
     _selectCommandTimer = nil;
-    
+
     [self.delegate textViewWillHandleMouseDown:event];
     [_mouseHandler mouseDown:event superCaller:^{ [super mouseDown:event]; }];
 }

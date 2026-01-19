@@ -58,6 +58,7 @@
 #import "iTermHapticActuator.h"
 #import "iTermHistogram.h"
 #import "iTermHotKeyController.h"
+#import "MTPerfMetrics.h"
 #import "iTermInitialDirectory.h"
 #import "iTermKeyLabels.h"
 #import "iTermLoggingHelper.h"
@@ -4425,6 +4426,7 @@ webViewConfiguration:(WKWebViewConfiguration *)webViewConfiguration
 }
 
 - (void)insertText:(NSString *)string {
+    MTPerfStart(MTPerfMetricKeyboardInput);
     if (_exited) {
         return;
     }
@@ -5599,6 +5601,7 @@ webViewConfiguration:(WKWebViewConfiguration *)webViewConfiguration
 }
 
 - (void)setWindowTitle:(NSString *)title {
+    MTPerfStart(MTPerfMetricTitleUpdate);
     [self.variablesScope setValue:title forVariableNamed:iTermVariableKeySessionWindowName];
     _titleDirty = YES;
     [_tmuxTitleMonitor updateOnce];

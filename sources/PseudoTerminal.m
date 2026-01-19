@@ -45,6 +45,7 @@
 #import "iTermMenuBarObserver.h"
 #import "iTermMetalDriver.h"
 #import "iTermObject.h"
+#import "MTPerfMetrics.h"
 #import "iTermOpenQuicklyWindow.h"
 #import "iTermOrderEnforcer.h"
 #import "iTermPasswordManagerWindowController.h"
@@ -2614,6 +2615,7 @@ ITERM_WEAKLY_REFERENCEABLE
         // During a live resize this has to be done immediately because the runloop doesn't get
         // around to delayed performs until the live resize is done (bug 2812).
         self.window.title = title;
+        MTPerfEnd(MTPerfMetricTitleUpdate);
         [self updateWindowMenu];
         DLog(@"in a live resize");
         return;
@@ -2635,6 +2637,7 @@ ITERM_WEAKLY_REFERENCEABLE
             // Unless the window was just created, set the title immediately. Issue 5876.
             DLog(@"set title immediately to %@", self.desiredTitle);
             self.window.title = self.desiredTitle;
+            MTPerfEnd(MTPerfMetricTitleUpdate);
             [self updateWindowMenu];
         }
         __weak __typeof(self) weakSelf = self;
@@ -4342,6 +4345,7 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
 }
 
 - (void)windowDidBecomeKey:(NSNotification *)aNotification {
+    MTPerfStart(MTPerfMetricWindowFocus);
     DLog(@"windowDidBecomeKey:%@ window=%@ stack:\n%@",
          aNotification, self.window, [NSThread callStackSymbols]);
 
@@ -6569,6 +6573,7 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
 }
 
 - (void)tabView:(NSTabView *)tabView didSelectTabViewItem:(NSTabViewItem *)tabViewItem {
+    MTPerfStart(MTPerfMetricTabSwitch);
     DLog(@"Did select tab view %@", tabViewItem);
     [_contentView.tabBarControl setFlashing:YES];
 

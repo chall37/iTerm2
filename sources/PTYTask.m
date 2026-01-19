@@ -24,6 +24,7 @@
 #import "iTermThreadSafety.h"
 #import "iTermTmuxJobManager.h"
 #import "NSDictionary+iTerm.h"
+#import "MTPerfMetrics.h"
 
 #import "iTerm2SharedARC-Swift.h"
 #include "iTermFileDescriptorClient.h"
@@ -337,6 +338,7 @@ static void HandleSigChld(int n) {
 // Send keyboard input, coprocess output, tmux commands, etc.
 - (void)writeTask:(NSData *)data {
     [self writeTask:data coprocess:NO];
+    MTPerfEnd(MTPerfMetricKeyboardInput);
 }
 
 - (void)writeTask:(NSData *)data coprocess:(BOOL)fromCoprocessOutput {
@@ -416,6 +418,7 @@ static void HandleSigChld(int n) {
 // defines the depth of our queue also determines (in the steady state) how much data can be
 // buffered and it's 1024 bytes * initial semaphore count.
 - (void)processRead {
+    MTPerfStart(MTPerfMetricOutput);
     int iterations = 4;
     int bytesRead = 0;
 
