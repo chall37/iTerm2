@@ -2,8 +2,8 @@
 //  MTPerfMetrics.m
 //  iTerm2
 //
-//  Lock-free latency instrumentation for multi-tab stress testing.
-//  Uses raw mach_absolute_time (~40ns overhead) instead of @synchronized.
+//  Low-overhead latency instrumentation for multi-tab stress testing.
+//  Uses atomics for start timestamps and a small lock for aggregate updates.
 //
 
 #import "MTPerfMetrics.h"
@@ -13,6 +13,7 @@
 #import <mach/mach_time.h>
 #import <math.h>
 #import <os/lock.h>
+#import <stdatomic.h>
 
 // Per-metric statistics structure (aggregated across all sessions)
 typedef struct {
@@ -49,46 +50,48 @@ void MTPerfInitialize(void) {
 
 void MTPerfStart(MTPerfMetricType type) {
     if (!gInitialized || type < 0 || type >= MTPerfMetricCount) return;
-    gStats[type].startTime = mach_absolute_time();
+    __atomic_store_n(&gStats[type].startTime, mach_absolute_time(), __ATOMIC_RELEASE);
 }
 
 void MTPerfEnd(MTPerfMetricType type) {
-    uint64_t end = mach_absolute_time();
-
     if (!gInitialized || type < 0 || type >= MTPerfMetricCount) return;
 
-    uint64_t start = gStats[type].startTime;
-    if (start == 0) return;  // No matching start
+    // Atomic exchange: read start time and clear it in one operation
+    uint64_t start = __atomic_exchange_n(&gStats[type].startTime, 0, __ATOMIC_ACQ_REL);
+    if (start == 0) return;  // No matching start - avoid mach_absolute_time()
 
+    uint64_t end = mach_absolute_time();
     uint64_t elapsed = end - start;
-    MTPerfStat *s = &gStats[type];
 
+    // Lock for aggregating into global stats (multi-field update)
+    os_unfair_lock_lock(&gStatsLock);
+    MTPerfStat *s = &gStats[type];
     s->count++;
     s->sum += elapsed;
     s->sumSquares += (double)elapsed * elapsed;
     if (elapsed < s->min) s->min = elapsed;
     if (elapsed > s->max) s->max = elapsed;
-    s->startTime = 0;  // Reset for next measurement
+    os_unfair_lock_unlock(&gStatsLock);
 }
 
 // Session-aware: stores startTime on the session object itself
 void MTPerfStartSession(MTPerfMetricType type, void *session) {
     if (!gInitialized || !session || type < 0 || type >= MTPerfMetricCount) return;
     id<MTPerfSession> s = (__bridge id<MTPerfSession>)session;
-    [s mtperfStartTimes][type] = mach_absolute_time();
+    __atomic_store_n(&[s mtperfStartTimes][type], mach_absolute_time(), __ATOMIC_RELEASE);
 }
 
 void MTPerfEndSession(MTPerfMetricType type, void *session) {
-    uint64_t end = mach_absolute_time();
-
     if (!gInitialized || !session || type < 0 || type >= MTPerfMetricCount) return;
 
     id<MTPerfSession> s = (__bridge id<MTPerfSession>)session;
     uint64_t *times = [s mtperfStartTimes];
-    uint64_t start = times[type];
-    if (start == 0) return;  // No matching start
-    times[type] = 0;  // Reset for next measurement
 
+    // Atomic exchange: read start time and clear it in one operation
+    uint64_t start = __atomic_exchange_n(&times[type], 0, __ATOMIC_ACQ_REL);
+    if (start == 0) return;  // No matching start - avoid mach_absolute_time()
+
+    uint64_t end = mach_absolute_time();
     uint64_t elapsed = end - start;
 
     // Lock only for aggregating into global stats

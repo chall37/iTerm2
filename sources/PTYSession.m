@@ -4440,10 +4440,10 @@ webViewConfiguration:(WKWebViewConfiguration *)webViewConfiguration
 }
 
 - (void)insertText:(NSString *)string {
-    MTPerfStartSession(MTPerfMetricKeyboardInput, (__bridge void *)self);
     if (_exited) {
         return;
     }
+    MTPerfStartSession(MTPerfMetricKeyboardInput, (__bridge void *)self);
 
     // Note: there used to be a weird special case where 0xa5 got converted to
     // backslash. I think it was based on a misunderstanding of how encodings

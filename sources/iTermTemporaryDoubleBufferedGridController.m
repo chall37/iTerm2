@@ -50,10 +50,10 @@
 }
 
 - (void)reset {
-    MTPerfStart(MTPerfMetricDoubleBufferExpire);
     if (_explicit) {
         return;
     }
+    MTPerfStart(MTPerfMetricDoubleBufferExpire);
     DLog(@"Reset saved grid (delegate=%@)", _delegate);
     self.dirty = YES;
     BOOL hadSavedGrid = _savedState != nil;
