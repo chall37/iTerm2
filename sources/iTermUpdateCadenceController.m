@@ -258,14 +258,22 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
         // This solves the bug where we don't redraw properly during live resize.
         // I'm worried about the possible side effects it might have since there's no way to
         // know all the tracking event loops.
+        NSTimeInterval interval = [self liveResizeInterval];
         [_updateTimer invalidate];
-        _updateTimer = [NSTimer weakTimerWithTimeInterval:[self liveResizeInterval]
+        _updateTimer = [NSTimer weakTimerWithTimeInterval:interval
                                                    target:self
                                                  selector:@selector(updateDisplay)
                                                  userInfo:nil
                                                   repeats:YES];
         [[NSRunLoop currentRunLoop] addTimer:_updateTimer forMode:NSRunLoopCommonModes];
         MTPerfIncrementCounter(MTPerfCounterNSTimerCreate);
+        if (interval < 0.020) {
+            MTPerfIncrementCounter(MTPerfCounterNSTimerInterval60);
+        } else if (interval <= 0.040) {
+            MTPerfIncrementCounter(MTPerfCounterNSTimerInterval30);
+        } else {
+            MTPerfIncrementCounter(MTPerfCounterNSTimerIntervalSlow);
+        }
     } else {
         if (!force && _updateTimer && cadence > _updateTimer.timeInterval) {
             DLog(@"Defer cadence change");
@@ -278,6 +286,13 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
                                                               userInfo:nil
                                                                repeats:YES];
             MTPerfIncrementCounter(MTPerfCounterNSTimerCreate);
+            if (cadence < 0.020) {
+                MTPerfIncrementCounter(MTPerfCounterNSTimerInterval60);
+            } else if (cadence <= 0.040) {
+                MTPerfIncrementCounter(MTPerfCounterNSTimerInterval30);
+            } else {
+                MTPerfIncrementCounter(MTPerfCounterNSTimerIntervalSlow);
+            }
         }
     }
 }

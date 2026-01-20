@@ -39,6 +39,9 @@ typedef NS_ENUM(NSInteger, MTPerfCounterType) {
     MTPerfCounterCadence1fps,         // backgroundInterval selected (not visible or idle)
     MTPerfCounterGCDTimerCreate,      // GCD cadence timer created/recreated
     MTPerfCounterNSTimerCreate,       // NSTimer cadence timer created/recreated
+    MTPerfCounterNSTimerInterval60,   // NSTimer created with <20ms interval (60+fps)
+    MTPerfCounterNSTimerInterval30,   // NSTimer created with 20-40ms interval (~30fps)
+    MTPerfCounterNSTimerIntervalSlow, // NSTimer created with >40ms interval (<25fps)
     MTPerfCounterGCDTimerFire,        // GCD cadence timer fired
     MTPerfCounterNSTimerFire,         // NSTimer cadence timer fired
     MTPerfCounterCadenceNoChange,     // _cadence == period, no timer recreation needed
