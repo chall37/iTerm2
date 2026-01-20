@@ -164,7 +164,14 @@ void MTPerfWriteToFile(void) {
         "BackgroundRefresh",
         "Cadence60fps",
         "Cadence30fps",
-        "Cadence1fps"
+        "Cadence1fps",
+        "TimerCreate",
+        "TimerFire",
+        "CadenceNoChange",
+        "CadenceMismatch",
+        "SlowFR30",
+        "SlowFR15",
+        "SlowFROther"
     };
 
     fprintf(f, "# Counters\n");

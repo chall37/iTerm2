@@ -184,6 +184,14 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
     } else {
         DLog(@"select slow frame rate");
         MTPerfIncrementCounter(MTPerfCounterCadence30fps);
+        // Track which slowFrameRate value is being used (Metal=30, non-Metal=15)
+        if (state.slowFrameRate == 30.0) {
+            MTPerfIncrementCounter(MTPerfCounterSlowFR30);
+        } else if (state.slowFrameRate == 15.0) {
+            MTPerfIncrementCounter(MTPerfCounterSlowFR15);
+        } else {
+            MTPerfIncrementCounter(MTPerfCounterSlowFROther);
+        }
         [self setUpdateCadence:[self slowAdaptiveInterval:&state]
                   liveResizing:state.liveResizing
                          force:force];
@@ -274,9 +282,11 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
     const NSTimeInterval period = liveResizing ? [self liveResizeInterval] : cadence;
     if (_cadence == period) {
         DLog(@"No change to cadence: %@", self);
+        MTPerfIncrementCounter(MTPerfCounterCadenceNoChange);
         return;
     }
     DLog(@"Set cadence of %@ to %f", self, cadence);
+    MTPerfIncrementCounter(MTPerfCounterCadenceMismatch);
 
     if (!force && _cadence > 0 && cadence > _cadence) {
         // Don't increase the cadence until after the screen has a chance to
@@ -303,9 +313,11 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
     __weak __typeof(self) weakSelf = self;
     dispatch_source_set_event_handler(_gcdUpdateTimer, ^{
         DLog(@"GCD cadence timer fired for %@", weakSelf);
+        MTPerfIncrementCounter(MTPerfCounterTimerFire);
         [weakSelf maybeUpdateDisplay];
     });
     dispatch_resume(_gcdUpdateTimer);
+    MTPerfIncrementCounter(MTPerfCounterTimerCreate);
 }
 
 - (BOOL)updateTimerIsValid {

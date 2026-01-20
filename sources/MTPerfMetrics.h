@@ -37,6 +37,13 @@ typedef NS_ENUM(NSInteger, MTPerfCounterType) {
     MTPerfCounterCadence60fps,        // fastAdaptiveInterval selected (visible, low throughput)
     MTPerfCounterCadence30fps,        // slowAdaptiveInterval selected (visible, high throughput)
     MTPerfCounterCadence1fps,         // backgroundInterval selected (not visible or idle)
+    MTPerfCounterTimerCreate,         // GCD cadence timer created/recreated
+    MTPerfCounterTimerFire,           // GCD cadence timer fired
+    MTPerfCounterCadenceNoChange,     // _cadence == period, no timer recreation needed
+    MTPerfCounterCadenceMismatch,     // _cadence != period, timer needs recreation
+    MTPerfCounterSlowFR30,            // slowFrameRate == 30 (Metal)
+    MTPerfCounterSlowFR15,            // slowFrameRate == 15 (non-Metal)
+    MTPerfCounterSlowFROther,         // slowFrameRate is neither 15 nor 30
     MTPerfCounterCount
 };
 
