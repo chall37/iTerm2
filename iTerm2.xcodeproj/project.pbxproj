@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		MTPERF0001000000000003 /* MTPerfMetrics.m in Sources */ = {isa = PBXBuildFile; fileRef = MTPERF0001000000000002 /* MTPerfMetrics.m */; };
 		06E0C88E1DF9695400AA061B /* iTermServiceProvider.h in Headers */ = {isa = PBXBuildFile; fileRef = 06E0C88C1DF9695400AA061B /* iTermServiceProvider.h */; };
 		1D027C111CD1867000B0FBFF /* iTermColorPresets.h in Headers */ = {isa = PBXBuildFile; fileRef = 1D027C0F1CD1867000B0FBFF /* iTermColorPresets.h */; };
 		1D0318281A42563A00932107 /* iTermImageWell.h in Headers */ = {isa = PBXBuildFile; fileRef = 1D0318261A42563A00932107 /* iTermImageWell.h */; };
@@ -5893,6 +5894,8 @@
 		1DFA9D6F18F3A30F008ADC98 /* PointerPreferencesViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.objc; path = PointerPreferencesViewController.m; sourceTree = "<group>"; tabWidth = 4; };
 		20D5CC6304E7AA0500000106 /* iTermApplicationDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.h; path = iTermApplicationDelegate.h; sourceTree = "<group>"; tabWidth = 4; };
 		20D5CC6404E7AA0500000106 /* iTermApplicationDelegate.m */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.objc; lineEnding = 0; path = iTermApplicationDelegate.m; sourceTree = "<group>"; tabWidth = 4; xcLanguageSpecificationIdentifier = xcode.lang.objc; };
+		MTPERF0001000000000001 /* MTPerfMetrics.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MTPerfMetrics.h; sourceTree = "<group>"; };
+		MTPERF0001000000000002 /* MTPerfMetrics.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MTPerfMetrics.m; sourceTree = "<group>"; };
 		20E74F4804E9089700000106 /* ITAddressBookMgr.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.h; path = ITAddressBookMgr.h; sourceTree = "<group>"; tabWidth = 4; };
 		20E74F4904E9089700000106 /* ITAddressBookMgr.m */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.objc; path = ITAddressBookMgr.m; sourceTree = "<group>"; tabWidth = 4; };
 		49A6E4081211CC6000D9AD6F /* Compatability.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Compatability.h; sourceTree = "<group>"; };
@@ -11387,6 +11390,8 @@
 				A6D463E92404482D005D073D /* iTermAlphaBlendingHelper.m */,
 				DDF0FD64062916F70080EF74 /* iTermApplication.m */,
 				20D5CC6404E7AA0500000106 /* iTermApplicationDelegate.m */,
+				MTPERF0001000000000001 /* MTPerfMetrics.h */,
+				MTPERF0001000000000002 /* MTPerfMetrics.m */,
 				A6D463E4240447AF005D073D /* iTermBackgroundColorView.h */,
 				A6D463E5240447AF005D073D /* iTermBackgroundColorView.m */,
 				A6F1B3BA269379D000546767 /* iTermClickSideEffects.h */,
@@ -19811,6 +19816,7 @@
 				A6EF5BC625BCCC0900807157 /* PseudoTerminalRestorer.m in Sources */,
 				A6DC8151285CF45C0050788C /* GPBAny.pbobjc.m in Sources */,
 				A6C762CA1B45C52B00E3C992 /* iTermApplicationDelegate.m in Sources */,
+				MTPERF0001000000000003 /* MTPerfMetrics.m in Sources */,
 				A6C762C11B45C52B00E3C992 /* NSTextField+iTerm.m in Sources */,
 				A6FEA2711CF2C8EE00376F28 /* iTermProfileHotKey.m in Sources */,
 				A6C763E61B45C70100E3C992 /* SCEvents.m in Sources */,
