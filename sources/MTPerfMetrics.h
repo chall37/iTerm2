@@ -30,6 +30,16 @@ typedef NS_ENUM(NSInteger, MTPerfMetricType) {
     MTPerfMetricCount                // = 9
 };
 
+// Counter types for non-latency metrics (simple event counts)
+typedef NS_ENUM(NSInteger, MTPerfCounterType) {
+    MTPerfCounterVisibleRefresh,      // Refresh calls for visible sessions
+    MTPerfCounterBackgroundRefresh,   // Refresh calls for background sessions
+    MTPerfCounterCadence60fps,        // fastAdaptiveInterval selected (visible, low throughput)
+    MTPerfCounterCadence30fps,        // slowAdaptiveInterval selected (visible, high throughput)
+    MTPerfCounterCadence1fps,         // backgroundInterval selected (not visible or idle)
+    MTPerfCounterCount
+};
+
 // Protocol for objects that store per-session start times
 // PTYSession conforms to this when ENABLE_MTPERF is set
 @protocol MTPerfSession <NSObject>
@@ -51,6 +61,9 @@ void MTPerfInitialize(void);
 // Called at app termination to write metrics file
 void MTPerfWriteToFile(void);
 
+// Counter API for simple event counts (visible/background refresh, cadence mode)
+void MTPerfIncrementCounter(MTPerfCounterType type);
+
 #else
 
 // No-op macros when disabled
@@ -60,6 +73,7 @@ void MTPerfWriteToFile(void);
 #define MTPerfEnd(type) ((void)0)
 #define MTPerfInitialize() ((void)0)
 #define MTPerfWriteToFile() ((void)0)
+#define MTPerfIncrementCounter(type) ((void)0)
 
 #endif  // ENABLE_MTPERF
 

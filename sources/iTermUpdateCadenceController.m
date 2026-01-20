@@ -9,6 +9,7 @@
 #import "iTermUpdateCadenceController.h"
 
 #import "DebugLogging.h"
+#import "MTPerfMetrics.h"
 #import "NSTimer+iTerm.h"
 #import "iTermAdvancedSettingsModel.h"
 #import "iTermHistogram.h"
@@ -147,6 +148,7 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
         // Periodic redraws not needed (i.e., nothing is blinking) and the session is idle. It doesn't matter
         // if the app itself is active because there's nothing to do so use the background update cadence.
         DLog(@"select background update cadence because the session is idle");
+        MTPerfIncrementCounter(MTPerfCounterCadence1fps);
         [self setUpdateCadence:kBackgroundUpdateCadence liveResizing:state.liveResizing force:force];
         return;
     }
@@ -155,6 +157,7 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
     if (!state.visible) {
         // Although self.isActive is true, the session is not visible so there's no point redrawing it.
         DLog(@"select background update cadence");
+        MTPerfIncrementCounter(MTPerfCounterCadence1fps);
         [self setUpdateCadence:[self backgroundInterval]
                   liveResizing:state.liveResizing
                          force:force];
@@ -174,11 +177,13 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
     const NSInteger estimatedThroughput = state.estimatedThroughput;
     if (estimatedThroughput < kThroughputLimit && estimatedThroughput > 0) {
         DLog(@"select fast cadence");
+        MTPerfIncrementCounter(MTPerfCounterCadence60fps);
         [self setUpdateCadence:[self fastAdaptiveInterval]
                   liveResizing:state.liveResizing
                          force:force];
     } else {
         DLog(@"select slow frame rate");
+        MTPerfIncrementCounter(MTPerfCounterCadence30fps);
         [self setUpdateCadence:[self slowAdaptiveInterval:&state]
                   liveResizing:state.liveResizing
                          force:force];
