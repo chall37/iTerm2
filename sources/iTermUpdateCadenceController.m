@@ -249,6 +249,7 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
 - (void)setTimerUpdateCadence:(NSTimeInterval)cadence liveResizing:(BOOL)liveResizing force:(BOOL)force {
     if (_updateTimer.timeInterval == cadence) {
         DLog(@"No change to cadence: %@", self);
+        MTPerfIncrementCounter(MTPerfCounterCadenceNoChange);
         return;
     }
     DLog(@"Set cadence of %@ to %f", self, cadence);
@@ -264,6 +265,7 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
                                                  userInfo:nil
                                                   repeats:YES];
         [[NSRunLoop currentRunLoop] addTimer:_updateTimer forMode:NSRunLoopCommonModes];
+        MTPerfIncrementCounter(MTPerfCounterNSTimerCreate);
     } else {
         if (!force && _updateTimer && cadence > _updateTimer.timeInterval) {
             DLog(@"Defer cadence change");
@@ -275,6 +277,7 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
                                                               selector:@selector(updateDisplay)
                                                               userInfo:nil
                                                                repeats:YES];
+            MTPerfIncrementCounter(MTPerfCounterNSTimerCreate);
         }
     }
 }
@@ -317,7 +320,7 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
         [weakSelf maybeUpdateDisplay];
     });
     dispatch_resume(_gcdUpdateTimer);
-    MTPerfIncrementCounter(MTPerfCounterTimerCreate);
+    MTPerfIncrementCounter(MTPerfCounterGCDTimerCreate);
 }
 
 - (BOOL)updateTimerIsValid {
