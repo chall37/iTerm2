@@ -260,6 +260,7 @@ typedef NS_ENUM(int, iTermShouldHaveTitleSeparator) {
 // new request is made before the timer is up this property gets changed. It is
 // reset to nil after the change is made in the window.
 @property(nonatomic, copy) NSString *desiredTitle;
+@property(nonatomic, weak) PTYSession *desiredTitleSession;  // Session for MTPerfEnd when timer fires
 
 @property(nonatomic, readonly) iTermVariables *variables;
 @property(nonatomic, readonly) iTermSwiftyString *windowTitleOverrideSwiftyString;
@@ -2525,6 +2526,11 @@ ITERM_WEAKLY_REFERENCEABLE
     }
 }
 
+- (void)setWindowTitleForSession:(PTYSession *)session {
+    NSString *subtitle = (self.canShowSubtitleInTitlebar ? self.currentSession.subtitle : @"") ?: @"";
+    [self setWindowTitle:[self undecoratedWindowTitle] subtitle:subtitle forSession:session];
+}
+
 - (BOOL)canShowSubtitleInTitlebar {
     switch ((iTermPreferencesTabStyle)[iTermPreferences intForKey:kPreferenceKeyTabStyle]) {
         case TAB_STYLE_MINIMAL:
@@ -2558,6 +2564,10 @@ ITERM_WEAKLY_REFERENCEABLE
 }
 
 - (void)setWindowTitle:(NSString *)title subtitle:(NSString *)subtitle {
+    [self setWindowTitle:title subtitle:subtitle forSession:nil];
+}
+
+- (void)setWindowTitle:(NSString *)title subtitle:(NSString *)subtitle forSession:(PTYSession *)session {
     DLog(@"setWindowTitle:%@ for %@", title, self);
     if (_deallocing) {
         // This uses -weakSelf and can be called during dealloc. Doing so is a crash.
@@ -2615,7 +2625,7 @@ ITERM_WEAKLY_REFERENCEABLE
         // During a live resize this has to be done immediately because the runloop doesn't get
         // around to delayed performs until the live resize is done (bug 2812).
         self.window.title = title;
-        MTPerfEnd(MTPerfMetricTitleUpdate);
+        MTPerfEndSession(MTPerfMetricTitleUpdate, (__bridge void *)session);
         [self updateWindowMenu];
         DLog(@"in a live resize");
         return;
@@ -2631,13 +2641,14 @@ ITERM_WEAKLY_REFERENCEABLE
     // terminal goes nuts and sends lots of title-change sequences.
     BOOL hadTimer = (self.desiredTitle != nil);
     self.desiredTitle = title;
+    self.desiredTitleSession = session;  // Track session for deferred MTPerfEnd
     DLog(@"After adjusting title, setWindowTitle:%@", title);
     if (!hadTimer) {
         if (!_windowWasJustCreated && ![self.ptyWindow titleChangedRecently]) {
             // Unless the window was just created, set the title immediately. Issue 5876.
             DLog(@"set title immediately to %@", self.desiredTitle);
             self.window.title = self.desiredTitle;
-            MTPerfEnd(MTPerfMetricTitleUpdate);
+            MTPerfEndSession(MTPerfMetricTitleUpdate, (__bridge void *)session);
             [self updateWindowMenu];
         }
         __weak __typeof(self) weakSelf = self;
@@ -2646,9 +2657,11 @@ ITERM_WEAKLY_REFERENCEABLE
             if (!(weakSelf.window.title == weakSelf.desiredTitle || [weakSelf.window.title isEqualToString:weakSelf.desiredTitle])) {
                 DLog(@"timer fired. Set title to %@", weakSelf.desiredTitle);
                 weakSelf.window.title = weakSelf.desiredTitle;
+                MTPerfEndSession(MTPerfMetricTitleUpdate, (__bridge void *)weakSelf.desiredTitleSession);
                 [weakSelf updateWindowMenu];
             }
             weakSelf.desiredTitle = nil;
+            weakSelf.desiredTitleSession = nil;
         });
     }
 }
@@ -6573,14 +6586,14 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
 }
 
 - (void)tabView:(NSTabView *)tabView didSelectTabViewItem:(NSTabViewItem *)tabViewItem {
-    MTPerfStart(MTPerfMetricTabSwitch);
+    PTYTab *tab = [tabViewItem identifier];
+    MTPerfStartSession(MTPerfMetricTabSwitch, (__bridge void *)[tab activeSession]);
     DLog(@"Did select tab view %@", tabViewItem);
     [_contentView.tabBarControl setFlashing:YES];
 
     if (self.autoCommandHistorySessionGuid) {
         [self hideAutoCommandHistory];
     }
-    PTYTab *tab = [tabViewItem identifier];
     for (PTYSession *aSession in [tab sessions]) {
         DLog(@"Clear new-output flag in %@", aSession);
         [aSession setNewOutput:NO];
@@ -12646,11 +12659,15 @@ typedef NS_ENUM(NSUInteger, iTermBroadcastCommand) {
     return self.variables;
 }
 
-- (void)tabDidSetWindowTitle:(PTYTab *)tab to:(NSString *)title {
+- (void)tabDidSetWindowTitle:(PTYTab *)tab to:(NSString *)title forSession:(PTYSession *)session {
     if (![iTermPreferences boolForKey:kPreferenceKeySeparateWindowTitlePerTab]) {
-        for (PTYSession *session in self.allSessions) {
-            [session setWindowTitle:title];
+        for (PTYSession *s in self.allSessions) {
+            [s setWindowTitle:title];
         }
+    }
+    // Trigger window title update if this is the current session
+    if (session == self.currentSession) {
+        [self setWindowTitleForSession:session];
     }
 }
 

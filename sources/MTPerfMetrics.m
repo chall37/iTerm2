@@ -12,12 +12,11 @@
 
 #import <mach/mach_time.h>
 #import <math.h>
+#import <os/lock.h>
 
-// Per-metric statistics structure
-// No locks needed - single-threaded aggregation at quit is acceptable
-// for diagnostics. Worst case: a few samples lost due to races.
+// Per-metric statistics structure (aggregated across all sessions)
 typedef struct {
-    uint64_t startTime;     // Current start timestamp (0 if not measuring)
+    uint64_t startTime;     // Global startTime for app-level metrics (WindowFocus)
     uint64_t count;         // Number of completed measurements
     double sum;             // Sum of elapsed times (for mean)
     double sumSquares;      // Sum of squared times (for variance)
@@ -29,6 +28,7 @@ static MTPerfStat gStats[MTPerfMetricCount];
 static char gTimestamp[20];  // "20260116_120517"
 static mach_timebase_info_data_t gTimebaseInfo;
 static BOOL gInitialized = NO;
+static os_unfair_lock gStatsLock = OS_UNFAIR_LOCK_INIT;
 
 void MTPerfInitialize(void) {
     if (gInitialized) return;
@@ -71,6 +71,37 @@ void MTPerfEnd(MTPerfMetricType type) {
     s->startTime = 0;  // Reset for next measurement
 }
 
+// Session-aware: stores startTime on the session object itself
+void MTPerfStartSession(MTPerfMetricType type, void *session) {
+    if (!gInitialized || !session || type < 0 || type >= MTPerfMetricCount) return;
+    id<MTPerfSession> s = (__bridge id<MTPerfSession>)session;
+    [s mtperfStartTimes][type] = mach_absolute_time();
+}
+
+void MTPerfEndSession(MTPerfMetricType type, void *session) {
+    uint64_t end = mach_absolute_time();
+
+    if (!gInitialized || !session || type < 0 || type >= MTPerfMetricCount) return;
+
+    id<MTPerfSession> s = (__bridge id<MTPerfSession>)session;
+    uint64_t *times = [s mtperfStartTimes];
+    uint64_t start = times[type];
+    if (start == 0) return;  // No matching start
+    times[type] = 0;  // Reset for next measurement
+
+    uint64_t elapsed = end - start;
+
+    // Lock only for aggregating into global stats
+    os_unfair_lock_lock(&gStatsLock);
+    MTPerfStat *stat = &gStats[type];
+    stat->count++;
+    stat->sum += elapsed;
+    stat->sumSquares += (double)elapsed * elapsed;
+    if (elapsed < stat->min) stat->min = elapsed;
+    if (elapsed > stat->max) stat->max = elapsed;
+    os_unfair_lock_unlock(&gStatsLock);
+}
+
 void MTPerfWriteToFile(void) {
     if (!gInitialized) return;
 
@@ -90,6 +121,7 @@ void MTPerfWriteToFile(void) {
         "TabSwitch",
         "WindowFocus",
         "TitleUpdate",
+        "TabTitleUpdate",
         "DoubleBufferExpire",
         "PostJoinedRefresh"
     };

@@ -1047,19 +1047,19 @@ const CGFloat PTYTextViewMarginClickGraceWidth = 2.0;
 
 - (void)setNeedsDisplayOnLine:(int)line {
     // End latency measurements for user interactions that result in a refresh
-    MTPerfEnd(MTPerfMetricMouseClick);
-    MTPerfEnd(MTPerfMetricTabSwitch);
+    MTPerfEndSession(MTPerfMetricMouseClick, (__bridge void *)self.delegate);
+    MTPerfEndSession(MTPerfMetricTabSwitch, (__bridge void *)self.delegate);
     MTPerfEnd(MTPerfMetricWindowFocus);
-    MTPerfEnd(MTPerfMetricPostJoinedRefresh);
+    MTPerfEndSession(MTPerfMetricPostJoinedRefresh, (__bridge void *)self.delegate);
     [self requestDelegateRedraw];
 }
 
 - (void)setNeedsDisplayOnLine:(int)y inRange:(VT100GridRange)range {
     // End latency measurements for user interactions that result in a refresh
-    MTPerfEnd(MTPerfMetricMouseClick);
-    MTPerfEnd(MTPerfMetricTabSwitch);
+    MTPerfEndSession(MTPerfMetricMouseClick, (__bridge void *)self.delegate);
+    MTPerfEndSession(MTPerfMetricTabSwitch, (__bridge void *)self.delegate);
     MTPerfEnd(MTPerfMetricWindowFocus);
-    MTPerfEnd(MTPerfMetricPostJoinedRefresh);
+    MTPerfEndSession(MTPerfMetricPostJoinedRefresh, (__bridge void *)self.delegate);
     [self requestDelegateRedraw];
 }
 
@@ -1129,7 +1129,7 @@ static NSString *iTermStringForEventPhase(NSEventPhase eventPhase) {
 }
 
 - (void)mouseDown:(NSEvent *)event {
-    MTPerfStart(MTPerfMetricMouseClick);
+    MTPerfStartSession(MTPerfMetricMouseClick, (__bridge void *)self.delegate);
     [_selectCommandTimer invalidate];
     [_selectCommandTimer release];
     _selectCommandTimer = nil;

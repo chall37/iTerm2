@@ -23,13 +23,25 @@ typedef NS_ENUM(NSInteger, MTPerfMetricType) {
     MTPerfMetricMouseClick,          // mouseDown -> setNeedsDisplay/refresh
     MTPerfMetricTabSwitch,           // didSelectTabViewItem -> first refresh
     MTPerfMetricWindowFocus,         // windowDidBecomeKey -> first refresh
-    MTPerfMetricTitleUpdate,         // setWindowTitle -> title displayed
+    MTPerfMetricTitleUpdate,         // setWindowTitle -> window title displayed
+    MTPerfMetricTabTitleUpdate,      // setIconName -> tab label displayed
     MTPerfMetricDoubleBufferExpire,  // reset -> temporaryDoubleBufferedGridDidExpire
     MTPerfMetricPostJoinedRefresh,   // performBlockWithJoinedThreads returns -> updateDisplayBecause completes
-    MTPerfMetricCount                // = 8
+    MTPerfMetricCount                // = 9
 };
 
-// Lock-free API (uses raw mach_absolute_time, ~40ns overhead)
+// Protocol for objects that store per-session start times
+// PTYSession conforms to this when ENABLE_MTPERF is set
+@protocol MTPerfSession <NSObject>
+- (uint64_t *)mtperfStartTimes;
+@end
+
+// Session-aware API: stores startTime on the session object itself
+// Pass the PTYSession pointer (or nil for global fallback)
+void MTPerfStartSession(MTPerfMetricType type, void *session);
+void MTPerfEndSession(MTPerfMetricType type, void *session);
+
+// Global API for app-level metrics (WindowFocus) - uses shared startTime
 void MTPerfStart(MTPerfMetricType type);
 void MTPerfEnd(MTPerfMetricType type);
 
@@ -42,6 +54,8 @@ void MTPerfWriteToFile(void);
 #else
 
 // No-op macros when disabled
+#define MTPerfStartSession(type, session) ((void)0)
+#define MTPerfEndSession(type, session) ((void)0)
 #define MTPerfStart(type) ((void)0)
 #define MTPerfEnd(type) ((void)0)
 #define MTPerfInitialize() ((void)0)
