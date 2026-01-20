@@ -316,7 +316,7 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
     __weak __typeof(self) weakSelf = self;
     dispatch_source_set_event_handler(_gcdUpdateTimer, ^{
         DLog(@"GCD cadence timer fired for %@", weakSelf);
-        MTPerfIncrementCounter(MTPerfCounterTimerFire);
+        MTPerfIncrementCounter(MTPerfCounterGCDTimerFire);
         [weakSelf maybeUpdateDisplay];
     });
     dispatch_resume(_gcdUpdateTimer);
@@ -339,6 +339,7 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
 }
 
 - (void)updateDisplay {
+    MTPerfIncrementCounter(MTPerfCounterNSTimerFire);
     if (_deferredCadenceChange) {
         [self changeCadenceIfNeeded:YES];
         _deferredCadenceChange = NO;
