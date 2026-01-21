@@ -14,6 +14,10 @@
 #import <math.h>
 #import <os/lock.h>
 
+#import "iTermAdvancedSettingsModel.h"
+#import "iTermPowerManager.h"
+#import "iTermPreferences.h"
+
 // Per-metric statistics structure (aggregated across all sessions)
 typedef struct {
     uint64_t startTime;     // Global startTime for app-level metrics (WindowFocus)
@@ -134,6 +138,41 @@ void MTPerfWriteToFile(void) {
     };
 
     fprintf(f, "# MTPerfMetrics Latency - %s\n", gTimestamp);
+
+    // Write context section - settings and state that affect framerate
+    fprintf(f, "# Context\n");
+
+    // Power state
+    iTermPowerManager *pm = [iTermPowerManager sharedInstance];
+    fprintf(f, "connectedToPower,%s\n", pm.connectedToPower ? "true" : "false");
+    fprintf(f, "hasBattery,%s\n", pm.hasBattery ? "true" : "false");
+    fprintf(f, "metalAllowed,%s\n", pm.metalAllowed ? "true" : "false");
+
+    // Low power mode (macOS 12.0+)
+    BOOL lowPowerMode = NO;
+    if (@available(macOS 12.0, *)) {
+        lowPowerMode = [[NSProcessInfo processInfo] isLowPowerModeEnabled];
+    }
+    fprintf(f, "lowPowerModeEnabled,%s\n", lowPowerMode ? "true" : "false");
+
+    // Metal preferences
+    fprintf(f, "pref.useMetal,%s\n",
+            [iTermPreferences boolForKey:kPreferenceKeyUseMetal] ? "true" : "false");
+    fprintf(f, "pref.disableMetalWhenUnplugged,%s\n",
+            [iTermPreferences boolForKey:kPreferenceKeyDisableMetalWhenUnplugged] ? "true" : "false");
+    fprintf(f, "pref.disableInLowPowerMode,%s\n",
+            [iTermPreferences boolForKey:kPreferenceKeyDisableInLowPowerMode] ? "true" : "false");
+    fprintf(f, "pref.maximizeThroughput,%s\n",
+            [iTermPreferences boolForKey:kPreferenceKeyMaximizeThroughput] ? "true" : "false");
+
+    // Framerate settings (advanced)
+    fprintf(f, "adv.slowFrameRate,%.1f\n", [iTermAdvancedSettingsModel slowFrameRate]);
+    fprintf(f, "adv.metalSlowFrameRate,%.1f\n", [iTermAdvancedSettingsModel metalSlowFrameRate]);
+    fprintf(f, "adv.maximumFrameRate,%.1f\n", [iTermAdvancedSettingsModel maximumFrameRate]);
+    fprintf(f, "adv.adaptiveFrameRateThroughputThreshold,%d\n",
+            [iTermAdvancedSettingsModel adaptiveFrameRateThroughputThreshold]);
+
+    // Latency metrics
     fprintf(f, "# metric,count,mean_ns,min_ns,max_ns,stddev_ns\n");
 
     for (int i = 0; i < MTPerfMetricCount; i++) {

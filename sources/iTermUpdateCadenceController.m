@@ -262,7 +262,7 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
         [_updateTimer invalidate];
         _updateTimer = [NSTimer weakTimerWithTimeInterval:interval
                                                    target:self
-                                                 selector:@selector(updateDisplay)
+                                                 selector:@selector(nsTimerFired)
                                                  userInfo:nil
                                                   repeats:YES];
         [[NSRunLoop currentRunLoop] addTimer:_updateTimer forMode:NSRunLoopCommonModes];
@@ -282,7 +282,7 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
             [_updateTimer invalidate];
             _updateTimer = [NSTimer scheduledWeakTimerWithTimeInterval:cadence
                                                                 target:self
-                                                              selector:@selector(updateDisplay)
+                                                              selector:@selector(nsTimerFired)
                                                               userInfo:nil
                                                                repeats:YES];
             MTPerfIncrementCounter(MTPerfCounterNSTimerCreate);
@@ -346,6 +346,11 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
     }
 }
 
+- (void)nsTimerFired {
+    MTPerfIncrementCounter(MTPerfCounterNSTimerFire);
+    [self maybeUpdateDisplay];
+}
+
 - (void)maybeUpdateDisplay {
     if ([iTermWarning showingWarning] || [NSApp modalWindow] || [self.delegate updateCadenceControllerWindowHasSheet]) {
         return;
@@ -354,7 +359,6 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
 }
 
 - (void)updateDisplay {
-    MTPerfIncrementCounter(MTPerfCounterNSTimerFire);
     if (_deferredCadenceChange) {
         [self changeCadenceIfNeeded:YES];
         _deferredCadenceChange = NO;
