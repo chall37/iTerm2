@@ -25,6 +25,7 @@
 #import "VT100Screen.h"
 #import "VT100ScreenMark.h"
 #import "WindowControllerInterface.h"
+#import "MTPerfMetrics.h"
 #import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
 #include <sys/time.h>
@@ -295,7 +296,7 @@ typedef enum {
 - (iTermVariableScope *)sessionTabScope;
 - (void)sessionDidReportSelectedTmuxPane:(PTYSession *)session;
 - (void)sessionDidUpdatePaneTitle:(PTYSession *)session;
-- (void)sessionDidSetWindowTitle:(NSString *)title;
+- (void)sessionDidSetWindowTitle:(NSString *)title forSession:(PTYSession *)session;
 - (void)sessionJobDidChange:(PTYSession *)session;
 - (void)sessionEditActions;
 - (void)sessionEditSnippets;

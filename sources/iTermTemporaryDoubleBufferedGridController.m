@@ -9,6 +9,7 @@
 #import "iTermTemporaryDoubleBufferedGridController.h"
 #import "iTermGCDTimer.h"
 #import "DebugLogging.h"
+#import "MTPerfMetrics.h"
 #import "VT100Grid.h"
 
 @interface iTermTemporaryDoubleBufferedGridController()
@@ -49,6 +50,7 @@
 }
 
 - (void)reset {
+    MTPerfStart(MTPerfMetricDoubleBufferExpire);
     if (_explicit) {
         return;
     }

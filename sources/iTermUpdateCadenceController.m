@@ -9,6 +9,7 @@
 #import "iTermUpdateCadenceController.h"
 
 #import "DebugLogging.h"
+#import "MTPerfMetrics.h"
 #import "NSTimer+iTerm.h"
 #import "iTermAdvancedSettingsModel.h"
 #import "iTermHistogram.h"
@@ -147,6 +148,7 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
         // Periodic redraws not needed (i.e., nothing is blinking) and the session is idle. It doesn't matter
         // if the app itself is active because there's nothing to do so use the background update cadence.
         DLog(@"select background update cadence because the session is idle");
+        MTPerfIncrementCounter(MTPerfCounterCadence1fps);
         [self setUpdateCadence:kBackgroundUpdateCadence liveResizing:state.liveResizing force:force];
         return;
     }
@@ -155,6 +157,7 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
     if (!state.visible) {
         // Although self.isActive is true, the session is not visible so there's no point redrawing it.
         DLog(@"select background update cadence");
+        MTPerfIncrementCounter(MTPerfCounterCadence1fps);
         [self setUpdateCadence:[self backgroundInterval]
                   liveResizing:state.liveResizing
                          force:force];
@@ -174,11 +177,21 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
     const NSInteger estimatedThroughput = state.estimatedThroughput;
     if (estimatedThroughput < kThroughputLimit && estimatedThroughput > 0) {
         DLog(@"select fast cadence");
+        MTPerfIncrementCounter(MTPerfCounterCadence60fps);
         [self setUpdateCadence:[self fastAdaptiveInterval]
                   liveResizing:state.liveResizing
                          force:force];
     } else {
         DLog(@"select slow frame rate");
+        MTPerfIncrementCounter(MTPerfCounterCadence30fps);
+        // Track which slowFrameRate value is being used (Metal=30, non-Metal=15)
+        if (state.slowFrameRate == 30.0) {
+            MTPerfIncrementCounter(MTPerfCounterSlowFR30);
+        } else if (state.slowFrameRate == 15.0) {
+            MTPerfIncrementCounter(MTPerfCounterSlowFR15);
+        } else {
+            MTPerfIncrementCounter(MTPerfCounterSlowFROther);
+        }
         [self setUpdateCadence:[self slowAdaptiveInterval:&state]
                   liveResizing:state.liveResizing
                          force:force];
@@ -236,6 +249,7 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
 - (void)setTimerUpdateCadence:(NSTimeInterval)cadence liveResizing:(BOOL)liveResizing force:(BOOL)force {
     if (_updateTimer.timeInterval == cadence) {
         DLog(@"No change to cadence: %@", self);
+        MTPerfIncrementCounter(MTPerfCounterCadenceNoChange);
         return;
     }
     DLog(@"Set cadence of %@ to %f", self, cadence);
@@ -244,13 +258,22 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
         // This solves the bug where we don't redraw properly during live resize.
         // I'm worried about the possible side effects it might have since there's no way to
         // know all the tracking event loops.
+        NSTimeInterval interval = [self liveResizeInterval];
         [_updateTimer invalidate];
-        _updateTimer = [NSTimer weakTimerWithTimeInterval:[self liveResizeInterval]
+        _updateTimer = [NSTimer weakTimerWithTimeInterval:interval
                                                    target:self
-                                                 selector:@selector(updateDisplay)
+                                                 selector:@selector(nsTimerFired)
                                                  userInfo:nil
                                                   repeats:YES];
         [[NSRunLoop currentRunLoop] addTimer:_updateTimer forMode:NSRunLoopCommonModes];
+        MTPerfIncrementCounter(MTPerfCounterNSTimerCreate);
+        if (interval < 0.020) {
+            MTPerfIncrementCounter(MTPerfCounterNSTimerInterval60);
+        } else if (interval <= 0.040) {
+            MTPerfIncrementCounter(MTPerfCounterNSTimerInterval30);
+        } else {
+            MTPerfIncrementCounter(MTPerfCounterNSTimerIntervalSlow);
+        }
     } else {
         if (!force && _updateTimer && cadence > _updateTimer.timeInterval) {
             DLog(@"Defer cadence change");
@@ -259,9 +282,17 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
             [_updateTimer invalidate];
             _updateTimer = [NSTimer scheduledWeakTimerWithTimeInterval:cadence
                                                                 target:self
-                                                              selector:@selector(updateDisplay)
+                                                              selector:@selector(nsTimerFired)
                                                               userInfo:nil
                                                                repeats:YES];
+            MTPerfIncrementCounter(MTPerfCounterNSTimerCreate);
+            if (cadence < 0.020) {
+                MTPerfIncrementCounter(MTPerfCounterNSTimerInterval60);
+            } else if (cadence <= 0.040) {
+                MTPerfIncrementCounter(MTPerfCounterNSTimerInterval30);
+            } else {
+                MTPerfIncrementCounter(MTPerfCounterNSTimerIntervalSlow);
+            }
         }
     }
 }
@@ -269,9 +300,11 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
     const NSTimeInterval period = liveResizing ? [self liveResizeInterval] : cadence;
     if (_cadence == period) {
         DLog(@"No change to cadence: %@", self);
+        MTPerfIncrementCounter(MTPerfCounterCadenceNoChange);
         return;
     }
     DLog(@"Set cadence of %@ to %f", self, cadence);
+    MTPerfIncrementCounter(MTPerfCounterCadenceMismatch);
 
     if (!force && _cadence > 0 && cadence > _cadence) {
         // Don't increase the cadence until after the screen has a chance to
@@ -298,9 +331,11 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
     __weak __typeof(self) weakSelf = self;
     dispatch_source_set_event_handler(_gcdUpdateTimer, ^{
         DLog(@"GCD cadence timer fired for %@", weakSelf);
+        MTPerfIncrementCounter(MTPerfCounterGCDTimerFire);
         [weakSelf maybeUpdateDisplay];
     });
     dispatch_resume(_gcdUpdateTimer);
+    MTPerfIncrementCounter(MTPerfCounterGCDTimerCreate);
 }
 
 - (BOOL)updateTimerIsValid {
@@ -309,6 +344,11 @@ static const NSTimeInterval kBackgroundUpdateCadence = 1;
     } else {
         return _updateTimer.isValid;
     }
+}
+
+- (void)nsTimerFired {
+    MTPerfIncrementCounter(MTPerfCounterNSTimerFire);
+    [self maybeUpdateDisplay];
 }
 
 - (void)maybeUpdateDisplay {

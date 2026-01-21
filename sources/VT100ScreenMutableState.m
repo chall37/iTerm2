@@ -37,6 +37,7 @@
 #import "iTermTextExtractor.h"
 #import "iTermTuple.h"
 #import "iTermURLStore.h"
+#import "MTPerfMetrics.h"
 
 #import <stdatomic.h>
 
@@ -4893,6 +4894,7 @@ lengthExcludingInBandSignaling:data.length
                                                   topmost:YES];
         }];
     }
+    MTPerfStartSession(MTPerfMetricPostJoinedRefresh, (__bridge void *)delegate);
 }
 
 - (void)performSynchroDanceWithBlock:(void (^)(void))block {
@@ -6367,6 +6369,7 @@ launchCoprocessWithCommand:(NSString *)command
 }
 
 - (void)temporaryDoubleBufferedGridDidExpire {
+    MTPerfEnd(MTPerfMetricDoubleBufferExpire);  // Uses global start/end (no clean session access)
     [self.currentGrid setAllDirty:YES];
     // Force the screen to redraw right away. Some users reported lag and this seems to fix it.
     // I think the update timer was hitting a worst case scenario which made the lag visible.
@@ -6456,6 +6459,7 @@ launchCoprocessWithCommand:(NSString *)command
 - (void)tokenExecutorDidExecuteWithLengthTotal:(NSInteger)lengthTotal
                 lengthExcludingInBandSignaling:(NSInteger)lengthExcludingInBandSignaling
                                     throughput:(NSInteger)throughput {
+    MTPerfEndSession(MTPerfMetricOutput, (__bridge void *)self.sideEffectPerformer.sideEffectPerformingScreenDelegate);
     [_executorUpdate addBytesExecutedTotal:lengthTotal
                   excludingInBandSignaling:lengthExcludingInBandSignaling];
     _executorUpdate.estimatedThroughput = throughput;

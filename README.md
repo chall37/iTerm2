@@ -45,6 +45,19 @@
 
 ---
 
+## 🔬 Fork Note: Performance Testing Tools
+
+This fork contains the `instrumentation-only` branch with stress testing and latency instrumentation for iTerm2 performance analysis:
+
+- **`tools/perf/run_multi_tab_stress_test.sh`** - Multi-tab stress test harness with synchronized load generation, DTrace metrics, and summary tables
+- **`tools/perf/stress_load.py`** - Configurable terminal output load generator
+- **Latency instrumentation** - Measures keyboard→display, output processing, title updates, and refresh timing
+- **Context capture** - Records power state, Metal settings, and framerate configuration with each run
+
+See the [`instrumentation-only`](../../tree/instrumentation-only) branch for details.
+
+---
+
 ## About
 
 iTerm2 is a powerful terminal emulator for macOS that brings the terminal into the modern age with features you never knew you always wanted.

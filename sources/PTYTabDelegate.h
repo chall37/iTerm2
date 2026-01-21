@@ -54,7 +54,7 @@ typedef NS_OPTIONS(NSUInteger, PTYTabState) {
 - (BOOL)tabAnyDragInProgress:(PTYTab *)tab;
 - (void)tabDidInvalidateStatusBar:(PTYTab *)tab;
 - (iTermVariables *)tabWindowVariables:(PTYTab *)tab;
-- (void)tabDidSetWindowTitle:(PTYTab *)tab to:(NSString *)title;
+- (void)tabDidSetWindowTitle:(PTYTab *)tab to:(NSString *)title forSession:(PTYSession *)session;
 - (void)tabHasNontrivialJobDidChange:(PTYTab *)tab;
 - (void)tabEditActions:(PTYTab *)tab;
 - (void)tabEditSnippets:(PTYTab *)tab;

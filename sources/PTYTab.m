@@ -16,6 +16,7 @@
 #import "iTermPreferenceDidChangeNotification.h"
 #import "iTermPreferences.h"
 #import "iTermPresentationController.h"
+#import "MTPerfMetrics.h"
 #import "iTermPromptOnCloseReason.h"
 #import "iTermProfilePreferences.h"
 #import "iTermSwiftyString.h"
@@ -732,11 +733,11 @@ static void SetAgainstGrainDim(BOOL isVertical, NSSize *dest, CGFloat value) {
 
 - (void)nameOfSession:(PTYSession *)session didChangeTo:(NSString*)newName {
     if ([self activeSession] == session) {
-        [self updateTabTitleForCurrentSessionName:newName];
+        [self updateTabTitleForCurrentSessionName:newName forSession:session];
     }
 }
 
-- (void)updateTabTitleForCurrentSessionName:(NSString *)newName {
+- (void)updateTabTitleForCurrentSessionName:(NSString *)newName forSession:(PTYSession *)session {
     NSString *const tmuxPrefix = [iTermAdvancedSettingsModel tmuxTitlePrefix];
     NSString *value = self.variablesScope.tabTitleOverride;
     if (value.length == 0) {
@@ -757,6 +758,7 @@ static void SetAgainstGrainDim(BOOL isVertical, NSSize *dest, CGFloat value) {
     }
     [self.variablesScope setValue:value forVariableNamed:iTermVariableKeyTabTitle];
     [tabViewItem_ setLabel:[self stringByAppendingSubtitleForActiveSession:value]];  // PSM uses bindings to bind the label to its title
+    MTPerfEndSession(MTPerfMetricTabTitleUpdate, (__bridge void *)session);
     [self.realParentWindow tabTitleDidChange:self];
 }
 
@@ -5593,7 +5595,7 @@ typedef struct {
 
 - (void)updateTabTitle {
     NSString *sessionName = [self.activeSession.variablesScope valueForVariableName:iTermVariableKeySessionPresentationName];
-    [self updateTabTitleForCurrentSessionName:sessionName];
+    [self updateTabTitleForCurrentSessionName:sessionName forSession:self.activeSession];
 }
 
 - (iTermVariableScope<iTermTabScope> *)variablesScope {
@@ -6946,8 +6948,8 @@ typedef struct {
     [_tmuxTitleMonitor updateOnce];
 }
 
-- (void)sessionDidSetWindowTitle:(NSString *)title {
-    [self.delegate tabDidSetWindowTitle:self to:title];
+- (void)sessionDidSetWindowTitle:(NSString *)title forSession:(PTYSession *)session {
+    [self.delegate tabDidSetWindowTitle:self to:title forSession:session];
 }
 
 - (void)sessionJobDidChange:(PTYSession *)session {

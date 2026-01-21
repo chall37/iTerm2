@@ -58,6 +58,7 @@
 #import "iTermMenuBarObserver.h"
 #import "iTermMigrationHelper.h"
 #import "iTermModifierRemapper.h"
+#import "MTPerfMetrics.h"
 #import "iTermNotificationController.h"
 #import "iTermOnboardingWindowController.h"
 #import "iTermPreferences.h"
@@ -995,6 +996,7 @@ static BOOL hasBecomeActive = NO;
 
 - (void)applicationWillTerminate:(NSNotification *)aNotification {
     DLog(@"applicationWillTerminate called");
+    MTPerfWriteToFile();
     [iTermController releaseSharedInstance];
     [[iTermModifierRemapper sharedInstance] setRemapModifiers:NO];
     DLog(@"applicationWillTerminate returning");
@@ -1333,6 +1335,7 @@ void TurnOnDebugLoggingAutomatically(void) {
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
+    MTPerfInitialize();
     if (@available(macOS 12, *)) {
         // ok
     } else {
