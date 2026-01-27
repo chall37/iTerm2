@@ -12,6 +12,20 @@
 #import "PSMTabBarCell.h"
 #import "PSMTabStyle.h"
 #import "PSMTabDragWindow.h"
+#import <os/signpost.h>
+#import <CoreVideo/CoreVideo.h>
+#import <sys/time.h>
+
+#if PSM_DEBUG_DRAG_PERFORMANCE
+static os_log_t PSMTabDragLog(void) {
+    static os_log_t log;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        log = os_log_create("com.iterm2.tabdrag", "animation");
+    });
+    return log;
+}
+#endif
 
 @interface PSMTabDragAssistant()
 @property (nonatomic, retain) PSMTabBarControl *sourceTabBar;
@@ -29,7 +43,27 @@
 // then order it back in. This property remembers the window and keeps a
 // reference to it.
 @property (nonatomic, retain) NSWindow *temporarilyHiddenWindow;
+
+- (void)displayLinkDidFire;
 @end
+
+// CVDisplayLink callback - runs on a background thread, so we need to get to main thread
+// Using CFRunLoopPerformBlock with event tracking mode since dispatch_async doesn't work well during drags
+static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink,
+                                    const CVTimeStamp *now,
+                                    const CVTimeStamp *outputTime,
+                                    CVOptionFlags flagsIn,
+                                    CVOptionFlags *flagsOut,
+                                    void *context) {
+    @autoreleasepool {
+        PSMTabDragAssistant *assistant = (__bridge PSMTabDragAssistant *)context;
+        CFRunLoopPerformBlock(CFRunLoopGetMain(), kCFRunLoopCommonModes, ^{
+            [assistant displayLinkDidFire];
+        });
+        CFRunLoopWakeUp(CFRunLoopGetMain());
+    }
+    return kCVReturnSuccess;
+}
 
 @implementation PSMTabDragAssistant {
     PSMTabBarControl *_destinationTabBar;
@@ -37,7 +71,7 @@
 
     // A window that shows the tab while it's being dragged.
     PSMTabDragWindow *_dragTabWindow;
-    
+
     // A window that shows a ghost pane while a tab is being dragged out of its tab bar
     PSMTabDragWindow *_dragViewWindow;
     NSSize _dragWindowOffset;
@@ -49,6 +83,28 @@
     NSPoint _currentMouseLoc;
     PSMTabBarCell *_targetCell;
     NSSize _dragTabOffset;
+
+    // The drag window stays at its initial position along the cross-axis
+    // (Y for horizontal tab bars, X for vertical) until movement exceeds a threshold.
+    NSPoint _initialDragWindowOrigin;
+    BOOL _dragThresholdExceeded;
+    BOOL _dragWindowOriginInitialized;
+
+    // CVDisplayLink for tracking mouse during drag (bypasses NSDraggingSession throttling)
+    CVDisplayLinkRef _displayLink;
+    NSPoint _lastPolledMouseLocation;
+
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    // Performance instrumentation: track timer fire times over the last 5 seconds.
+    NSMutableArray<NSNumber *> *_timerFireTimes;
+
+    int _pollingEventCount;
+    CFAbsoluteTime _pollingFirstEventTime;
+    CFAbsoluteTime _pollingLastEventTime;
+    // Timestamp overlay window for debugging
+    NSWindow *_timestampWindow;
+    NSTextField *_timestampLabel;
+#endif
 }
 
 #pragma mark -
@@ -68,12 +124,19 @@
     if (self) {
         _participatingTabBars = [[NSMutableSet alloc] init];
         _sineCurveWidths = [[NSMutableArray alloc] initWithCapacity:kPSMTabDragAnimationSteps];
+#if PSM_DEBUG_DRAG_PERFORMANCE
+        _timerFireTimes = [[NSMutableArray alloc] init];
+#endif
     }
 
     return self;
 }
 
 - (void)dealloc {
+    if (_displayLink) {
+        CVDisplayLinkStop(_displayLink);
+        CVDisplayLinkRelease(_displayLink);
+    }
     [_sourceTabBar release];
     [_destinationTabBar release];
     [_participatingTabBars release];
@@ -82,6 +145,9 @@
     [_sineCurveWidths release];
     [_targetCell release];
     [_temporarilyHiddenWindow release];
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    [_timerFireTimes release];
+#endif
     [super dealloc];
 }
 
@@ -89,16 +155,25 @@
 #pragma mark Functionality
 
 - (void)addSineCurveWidthsWithOrientation:(PSMTabBarOrientation)orientation size:(NSSize)size {
-    float cellStepSize = (orientation == PSMTabBarHorizontalOrientation) ? (size.width + 6) : (size.height + 1);
-    for (int i = 0; i < kPSMTabDragAnimationSteps - 1; i++) {
-        int thisWidth = (int)(cellStepSize - ((cellStepSize/2.0) + ((sin((PI/2.0) + ((float)i/(float)kPSMTabDragAnimationSteps)*PI) * cellStepSize) / 2.0)));
+    // Use a cosine-based curve where width[i] + width[N-i] = cellWidth.
+    // This ensures that when one placeholder shrinks and another grows during a target change,
+    // the total width remains constant, preventing tabs from stuttering/shifting.
+    const int cellWidth = (orientation == PSMTabBarHorizontalOrientation) ? (int)size.width : (int)size.height;
+    const int steps = kPSMTabDragAnimationSteps;
+    for (int i = 0; i < steps; i++) {
+        // Formula: cellWidth * (1 - cos(π * i / (steps-1))) / 2
+        // This gives 0 at i=0, cellWidth at i=steps-1, and width[i] + width[steps-1-i] = cellWidth
+        const double fraction = (1.0 - cos(PI * (double)i / (double)(steps - 1))) / 2.0;
+        const int thisWidth = (int)round(cellWidth * fraction);
         [_sineCurveWidths addObject:@(thisWidth)];
     }
-    int width = (orientation == PSMTabBarHorizontalOrientation) ? size.width : size.height;
-    [_sineCurveWidths addObject:@(width)];
 }
 
 - (void)startAnimation {
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    NSLog(@"[PSMTabDrag] Starting animation timer at 30 FPS");
+    [_timerFireTimes removeAllObjects];
+#endif
     _animationTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 / 30.0
                                                        target:self
                                                      selector:@selector(animateDrag:)
@@ -148,6 +223,10 @@
     [[cell indicator] removeFromSuperview];
     [self distributePlaceholdersInTabBar:control withDraggedCell:cell];
 
+    // Set the initial mouse location so the first animation frame can correctly
+    // track the target cell.
+    [self setCurrentMouseLoc:[control convertPoint:[event locationInWindow] fromView:nil]];
+
     if ([control isFlipped]) {
         cellFrame.origin.y += cellFrame.size.height;
     }
@@ -193,6 +272,28 @@
                                                                          source:control];
     draggingSession.animatesToStartingPositionsOnCancelOrFail = YES;
     draggingSession.draggingFormation = NSDraggingFormationNone;
+
+    // Set up high-frequency polling timer to track mouse position during drag
+    // This bypasses the throttled NSDraggingSession callbacks
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    _pollingEventCount = 0;
+    _pollingFirstEventTime = 0;
+    _pollingLastEventTime = 0;
+#endif
+    _lastPolledMouseLocation = NSZeroPoint;
+
+    // Create CVDisplayLink for display-synchronized mouse tracking
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    NSLog(@"[PSMTabDrag] Starting CVDisplayLink for mouse tracking");
+#endif
+    CVDisplayLinkCreateWithActiveCGDisplays(&_displayLink);
+    CVDisplayLinkSetOutputCallback(_displayLink, &DisplayLinkCallback, (__bridge void *)self);
+    CVDisplayLinkStart(_displayLink);
+
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    // Create timestamp overlay window for debugging
+    [self createTimestampWindow];
+#endif
 
     [control release];
 }
@@ -651,6 +752,25 @@
 
 - (void)finishDrag {
     ILog(@"Drag of %p finished from\n%@", [self sourceTabBar], [NSThread callStackSymbols]);
+
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    // Close timestamp overlay
+    [self closeTimestampWindow];
+#endif
+
+    // Stop CVDisplayLink and log final stats
+    if (_displayLink) {
+#if PSM_DEBUG_DRAG_PERFORMANCE
+        double elapsed = _pollingFirstEventTime > 0 ? (CACurrentMediaTime() - _pollingFirstEventTime) : 0;
+        double avgRate = elapsed > 0 ? (_pollingEventCount / elapsed) : 0;
+        NSLog(@"[PSMTabDrag] Stopping CVDisplayLink. Total updates: %d over %.2fs (avg %.1f updates/sec)",
+              _pollingEventCount, elapsed, avgRate);
+#endif
+        CVDisplayLinkStop(_displayLink);
+        CVDisplayLinkRelease(_displayLink);
+        _displayLink = NULL;
+    }
+
     [[self sourceTabBar] dragDidFinish];
     if ([[[self sourceTabBar] tabView] numberOfTabViewItems] == 0 &&
         [[[self sourceTabBar] delegate] respondsToSelector:@selector(tabView:closeWindowForLastTabViewItem:)]) {
@@ -672,6 +792,7 @@
 
     const BOOL wasDragging = self.isDragging;
     [self setIsDragging:NO];
+    _dragWindowOriginInitialized = NO;
     [self removeAllPlaceholdersFromTabBar:[self sourceTabBar]];
     [self setSourceTabBar:nil];
     [self setDestinationTabBar:nil];
@@ -680,6 +801,9 @@
     }
     [_participatingTabBars removeAllObjects];
     [self setDraggedCell:nil];
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    NSLog(@"[PSMTabDrag] Stopping animation timer. Final FPS stats: %d frames recorded", (int)_timerFireTimes.count);
+#endif
     [_animationTimer invalidate];
     _animationTimer = nil;
     [_sineCurveWidths removeAllObjects];
@@ -700,6 +824,13 @@
 - (void)draggingBeganAt:(NSPoint)aPoint {
     ILog(@"Drag of %p began with current event %@ in window with frame %@ from\n%@", [self sourceTabBar], [NSApp currentEvent], NSStringFromRect(self.sourceTabBar.window.frame), [NSThread callStackSymbols]);
     if (_dragTabWindow) {
+        // Remember the initial drag window origin so it can stay stable along the
+        // cross-axis until movement exceeds a threshold.
+        _initialDragWindowOrigin = NSMakePoint(aPoint.x - _dragTabOffset.width,
+                                               aPoint.y - _dragTabOffset.height);
+        _dragThresholdExceeded = NO;
+        _dragWindowOriginInitialized = YES;
+
         [self moveDragTabWindowForMouseLocation:aPoint];
 
         if ([[[self sourceTabBar] tabView] numberOfTabViewItems] == 1) {
@@ -717,18 +848,192 @@
     return aPoint;
 }
 
+// Adjusts the mouse location to keep the drag window stable along the cross-axis
+// (Y for horizontal tab bars, X for vertical) until movement exceeds a threshold.
+- (NSPoint)adjustedMouseLocationForDrag:(NSPoint)mouseLocation {
+    if (_dragThresholdExceeded) {
+        return mouseLocation;
+    }
+
+    NSPoint windowOrigin = NSMakePoint(mouseLocation.x - _dragTabOffset.width,
+                                       mouseLocation.y - _dragTabOffset.height);
+
+    const NSSize kDragThreshold = { .width = 40.0, .height = 20.0 };
+    CGFloat deviation;
+    CGFloat threshold;
+    if ([[self sourceTabBar] orientation] == PSMTabBarHorizontalOrientation) {
+        deviation = fabs(windowOrigin.y - _initialDragWindowOrigin.y);
+        threshold = kDragThreshold.height;
+    } else {
+        deviation = fabs(windowOrigin.x - _initialDragWindowOrigin.x);
+        threshold = kDragThreshold.width;
+    }
+
+    if (deviation > threshold) {
+        _dragThresholdExceeded = YES;
+        return mouseLocation;
+    }
+
+    // Clamp to initial position along the cross-axis.
+    if ([[self sourceTabBar] orientation] == PSMTabBarHorizontalOrientation) {
+        mouseLocation.y = _initialDragWindowOrigin.y + _dragTabOffset.height;
+    } else {
+        mouseLocation.x = _initialDragWindowOrigin.x + _dragTabOffset.width;
+    }
+    return mouseLocation;
+}
+
+#if PSM_DEBUG_DRAG_PERFORMANCE
+- (void)createTimestampWindow {
+    // Create a small overlay window to show the current timestamp with microsecond precision
+    // Position it at top-left of main screen, below menu bar
+    NSScreen *mainScreen = [NSScreen mainScreen];
+    CGFloat screenHeight = mainScreen.frame.size.height;
+    CGFloat windowWidth = 280;
+    CGFloat windowHeight = 30;
+    // Position near top-left, accounting for menu bar (~25px)
+    NSRect frame = NSMakeRect(20, screenHeight - windowHeight - 50, windowWidth, windowHeight);
+
+    _timestampWindow = [[NSWindow alloc] initWithContentRect:frame
+                                                   styleMask:NSWindowStyleMaskBorderless
+                                                     backing:NSBackingStoreBuffered
+                                                       defer:NO];
+    [_timestampWindow setLevel:NSStatusWindowLevel + 1];
+    [_timestampWindow setOpaque:NO];
+    [_timestampWindow setBackgroundColor:[NSColor colorWithCalibratedWhite:0.0 alpha:0.8]];
+    [_timestampWindow setIgnoresMouseEvents:YES];
+
+    _timestampLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(5, 5, 270, 20)];
+    [_timestampLabel setBezeled:NO];
+    [_timestampLabel setDrawsBackground:NO];
+    [_timestampLabel setEditable:NO];
+    [_timestampLabel setSelectable:NO];
+    [_timestampLabel setTextColor:[NSColor greenColor]];
+    [_timestampLabel setFont:[NSFont monospacedSystemFontOfSize:14 weight:NSFontWeightMedium]];
+    [_timestampLabel setAlignment:NSTextAlignmentCenter];
+
+    [[_timestampWindow contentView] addSubview:_timestampLabel];
+    [_timestampWindow orderFront:nil];
+
+    [self updateTimestampDisplay];
+}
+
+- (void)updateTimestampDisplay {
+    if (!_timestampWindow) return;
+
+    // Get current time with microsecond precision
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    // Format as HH:MM:SS.microseconds
+    time_t rawtime = tv.tv_sec;
+    struct tm *timeinfo = localtime(&rawtime);
+
+    NSString *timestamp = [NSString stringWithFormat:@"%02d:%02d:%02d.%06d",
+                          timeinfo->tm_hour,
+                          timeinfo->tm_min,
+                          timeinfo->tm_sec,
+                          tv.tv_usec];
+
+    [_timestampLabel setStringValue:timestamp];
+}
+
+- (void)closeTimestampWindow {
+    if (_timestampWindow) {
+        [_timestampWindow orderOut:nil];
+        [_timestampLabel release];
+        _timestampLabel = nil;
+        [_timestampWindow release];
+        _timestampWindow = nil;
+    }
+}
+#endif
+
+- (void)displayLinkDidFire {
+    if (!self.isDragging || !_dragTabWindow || !_dragWindowOriginInitialized) {
+        return;
+    }
+
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    // Update timestamp display
+    [self updateTimestampDisplay];
+#endif
+
+    // Get current mouse location in screen coordinates
+    // This is the same coordinate system used by draggingSession:movedToPoint:
+    NSPoint screenPoint = [NSEvent mouseLocation];
+
+    // Skip if mouse hasn't moved
+    if (NSEqualPoints(screenPoint, _lastPolledMouseLocation)) {
+        return;
+    }
+    _lastPolledMouseLocation = screenPoint;
+
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    CFAbsoluteTime now = CACurrentMediaTime();
+    _pollingEventCount++;
+
+    if (_pollingFirstEventTime == 0) {
+        _pollingFirstEventTime = now;
+    }
+
+    double sinceLast = _pollingLastEventTime > 0 ? (now - _pollingLastEventTime) * 1000 : 0;
+    double elapsed = now - _pollingFirstEventTime;
+    double avgRate = elapsed > 0 ? (_pollingEventCount / elapsed) : 0;
+
+    // Log every 60th update, or first 3
+    if (_pollingEventCount <= 3 || _pollingEventCount % 60 == 0) {
+        NSLog(@"[PSMTabDrag] DisplayLink #%d: interval=%.1fms, avg=%.1f updates/sec, pos=(%.0f, %.0f)",
+              _pollingEventCount, sinceLast, avgRate, screenPoint.x, screenPoint.y);
+    }
+    _pollingLastEventTime = now;
+#endif
+
+    // Apply the cross-axis clamping logic and update window positions
+    NSPoint adjustedPoint = [self adjustedMouseLocationForDrag:screenPoint];
+    [self moveDragTabWindowForMouseLocation:adjustedPoint];
+
+    if (_dragViewWindow) {
+        [_dragViewWindow setFrameTopLeftPoint:[self topLeftPointOfDragViewWindowForMouseLocation:adjustedPoint]];
+    }
+}
+
 - (void)draggingMovedTo:(NSPoint)aPoint {
-    if (_dragTabWindow) {
-        [self moveDragTabWindowForMouseLocation:aPoint];
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    static CFAbsoluteTime lastMoveTime = 0;
+    static int moveCount = 0;
+    CFAbsoluteTime now = CACurrentMediaTime();
 
-        if (_dragViewWindow) {
-            //move the view representation with the tab
-            //the relative position of the dragged view window will be different
-            //depending on the position of the tab bar relative to the controlled tab view
-
-            [_dragViewWindow setFrameTopLeftPoint:[self topLeftPointOfDragViewWindowForMouseLocation:aPoint]];
+    if (lastMoveTime > 0) {
+        CFAbsoluteTime interval = now - lastMoveTime;
+        moveCount++;
+        // Log every 30th call to avoid spam
+        if (moveCount % 30 == 0) {
+            NSLog(@"[PSMTabDrag] draggingMovedTo interval: %.2fms (call #%d)", interval * 1000, moveCount);
         }
     }
+    lastMoveTime = now;
+
+    os_signpost_interval_begin(PSMTabDragLog(), OS_SIGNPOST_ID_EXCLUSIVE, "draggingMovedTo", "");
+    CFAbsoluteTime start = CFAbsoluteTimeGetCurrent();
+#endif
+
+    if (_dragTabWindow) {
+        // Don't update window position here - the polling timer handles it with
+        // fresher coordinates. The NSDraggingSession callbacks are severely throttled
+        // and provide stale positions that would cause the window to jump back.
+        //
+        // The polling timer in pollMouseLocation: uses [NSEvent mouseLocation] which
+        // returns current coordinates, unlike the lagging draggingSession:movedToPoint:.
+    }
+
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    CFAbsoluteTime end = CFAbsoluteTimeGetCurrent();
+    if ((end - start) * 1000 > 1.0) {  // Only log if > 1ms
+        NSLog(@"[PSMTabDrag] draggingMovedTo took %.2fms", (end - start) * 1000);
+    }
+    os_signpost_interval_end(PSMTabDragLog(), OS_SIGNPOST_ID_EXCLUSIVE, "draggingMovedTo", "");
+#endif
 }
 
 - (void)fadeInDragWindow:(NSTimer *)timer {
@@ -762,21 +1067,65 @@
 #pragma mark Animation
 
 - (void)animateDrag:(NSTimer *)timer {
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    os_signpost_interval_begin(PSMTabDragLog(), OS_SIGNPOST_ID_EXCLUSIVE, "animateDrag", "");
+    CFAbsoluteTime overallStart = CFAbsoluteTimeGetCurrent();
+
+    // Track frame rate over the last 5 seconds.
+    CFAbsoluteTime now = CACurrentMediaTime();
+    [_timerFireTimes addObject:@(now)];
+    const CFAbsoluteTime windowSeconds = 5.0;
+    while (_timerFireTimes.count > 0 && (now - _timerFireTimes.firstObject.doubleValue) > windowSeconds) {
+        [_timerFireTimes removeObjectAtIndex:0];
+    }
+    if (_timerFireTimes.count > 1) {
+        CFAbsoluteTime windowStart = _timerFireTimes.firstObject.doubleValue;
+        CFAbsoluteTime elapsed = now - windowStart;
+        double fps = (_timerFireTimes.count - 1) / elapsed;
+        NSLog(@"[PSMTabDrag] Timer effective FPS over last %.1fs: %.1f (%d frames)",
+              elapsed, fps, (int)_timerFireTimes.count);
+    }
+#endif
+
     NSArray* objects = [_participatingTabBars allObjects];
     for (int i = 0; i < [objects count]; ++i) {
         PSMTabBarControl* tabBar = [objects objectAtIndex:i];
         if ([_participatingTabBars containsObject:tabBar]) {
+#if PSM_DEBUG_DRAG_PERFORMANCE
+            CFAbsoluteTime calcStart = CFAbsoluteTimeGetCurrent();
+#endif
             [self calculateDragAnimationForTabBar:tabBar];
+#if PSM_DEBUG_DRAG_PERFORMANCE
+            CFAbsoluteTime calcEnd = CFAbsoluteTimeGetCurrent();
+            NSLog(@"[PSMTabDrag] calculateDragAnimationForTabBar took %.2f ms", (calcEnd - calcStart) * 1000);
+
+            CFAbsoluteTime displayStart = CFAbsoluteTimeGetCurrent();
+#endif
             [[NSRunLoop currentRunLoop] performSelector:@selector(display)
                                                  target:tabBar
                                                argument:nil
                                                   order:1
                                                   modes:@[ NSEventTrackingRunLoopMode, NSDefaultRunLoopMode ]];
+#if PSM_DEBUG_DRAG_PERFORMANCE
+            CFAbsoluteTime displayEnd = CFAbsoluteTimeGetCurrent();
+            NSLog(@"[PSMTabDrag] display scheduling took %.2f ms", (displayEnd - displayStart) * 1000);
+#endif
         }
     }
+
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    CFAbsoluteTime overallEnd = CFAbsoluteTimeGetCurrent();
+    NSLog(@"[PSMTabDrag] animateDrag total took %.2f ms", (overallEnd - overallStart) * 1000);
+    os_signpost_interval_end(PSMTabDragLog(), OS_SIGNPOST_ID_EXCLUSIVE, "animateDrag", "");
+#endif
 }
 
 - (void)calculateDragAnimationForTabBar:(PSMTabBarControl *)control {
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    os_signpost_interval_begin(PSMTabDragLog(), OS_SIGNPOST_ID_EXCLUSIVE, "calculateDragAnimation", "");
+    CFAbsoluteTime targetCellStart = CFAbsoluteTimeGetCurrent();
+#endif
+
     BOOL removeFlag = YES;
     NSArray *cells = [control cells];
     int i, cellCount = [cells count];
@@ -785,54 +1134,116 @@
     // identify target cell
     // mouse at beginning of tabs
     NSPoint mouseLoc = [self currentMouseLoc];
+    PSMTabBarCell *proposedTarget = nil;
+
     if ([self destinationTabBar] == control) {
         removeFlag = NO;
         if (mouseLoc.x < [[control style] leftMarginForTabBarControl]) {
-            [self setTargetCell:[cells objectAtIndex:0]];
+            proposedTarget = [cells objectAtIndex:0];
         } else {
             NSRect overCellRect;
             PSMTabBarCell *overCell = [control cellForPoint:mouseLoc cellFrame:&overCellRect];
             if (overCell) {
                 // mouse among cells - placeholder
                 if ([overCell isPlaceholder]) {
-                    [self setTargetCell:overCell];
+                    proposedTarget = overCell;
                 } else if ([control orientation] == PSMTabBarHorizontalOrientation) {
                     // non-placeholders - horizontal orientation
                     if (mouseLoc.x < (overCellRect.origin.x + (overCellRect.size.width / 2.0))) {
                         // mouse on left side of cell
-                        [self setTargetCell:[cells objectAtIndex:([cells indexOfObject:overCell] - 1)]];
+                        proposedTarget = [cells objectAtIndex:([cells indexOfObject:overCell] - 1)];
                     } else {
                         // mouse on right side of cell
-                        [self setTargetCell:[cells objectAtIndex:([cells indexOfObject:overCell] + 1)]];
+                        proposedTarget = [cells objectAtIndex:([cells indexOfObject:overCell] + 1)];
                     }
                 } else {
                     // non-placeholders - vertical orientation
                     if (mouseLoc.y < (overCellRect.origin.y + (overCellRect.size.height / 2.0))) {
                         // mouse on top of cell
-                        [self setTargetCell:[cells objectAtIndex:([cells indexOfObject:overCell] - 1)]];
+                        proposedTarget = [cells objectAtIndex:([cells indexOfObject:overCell] - 1)];
                     } else {
                         // mouse on bottom of cell
-                        [self setTargetCell:[cells objectAtIndex:([cells indexOfObject:overCell] + 1)]];
+                        proposedTarget = [cells objectAtIndex:([cells indexOfObject:overCell] + 1)];
                     }
                 }
             } else {
                 // out at end - must find proper cell (could be more in overflow menu)
-                [self setTargetCell:[control lastVisibleTab]];
+                proposedTarget = [control lastVisibleTab];
             }
         }
+
+        // Apply hysteresis to prevent target bouncing due to animation-induced boundary shifts.
+        // Only change target if it's different AND the mouse is sufficiently into the new target area.
+        PSMTabBarCell *currentTarget = [self targetCell];
+        if (proposedTarget != currentTarget && currentTarget != nil && proposedTarget != nil) {
+            // Check if mouse is far enough into the proposed target to accept the change
+            NSRect proposedFrame = [proposedTarget frame];
+            CGFloat hysteresis = 8.0; // pixels of hysteresis
+
+            if ([control orientation] == PSMTabBarHorizontalOrientation) {
+                NSInteger proposedIndex = [cells indexOfObject:proposedTarget];
+                NSInteger currentIndex = [cells indexOfObject:currentTarget];
+
+                if (proposedIndex > currentIndex) {
+                    // Moving right - mouse must be hysteresis pixels past the left edge of proposed target
+                    if (mouseLoc.x < proposedFrame.origin.x + hysteresis) {
+                        proposedTarget = currentTarget; // Keep current target
+                    }
+                } else {
+                    // Moving left - mouse must be hysteresis pixels before the right edge of proposed target
+                    if (mouseLoc.x > NSMaxX(proposedFrame) - hysteresis) {
+                        proposedTarget = currentTarget; // Keep current target
+                    }
+                }
+            } else {
+                NSInteger proposedIndex = [cells indexOfObject:proposedTarget];
+                NSInteger currentIndex = [cells indexOfObject:currentTarget];
+
+                if (proposedIndex > currentIndex) {
+                    // Moving down
+                    if (mouseLoc.y < proposedFrame.origin.y + hysteresis) {
+                        proposedTarget = currentTarget;
+                    }
+                } else {
+                    // Moving up
+                    if (mouseLoc.y > NSMaxY(proposedFrame) - hysteresis) {
+                        proposedTarget = currentTarget;
+                    }
+                }
+            }
+        }
+
+        [self setTargetCell:proposedTarget];
     } else {
         [self setTargetCell:nil];
     }
+
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    CFAbsoluteTime targetCellEnd = CFAbsoluteTimeGetCurrent();
+    CFAbsoluteTime cellLoopStart = CFAbsoluteTimeGetCurrent();
+    int cellsProcessed = 0;
+#endif
 
     for (i = 0; i < cellCount; i++) {
         PSMTabBarCell *cell = [cells objectAtIndex:i];
         NSRect newRect = [cell frame];
         if (![cell isInOverflowMenu]) {
+#if PSM_DEBUG_DRAG_PERFORMANCE
+            cellsProcessed++;
+#endif
             if([cell isPlaceholder]){
                 if (cell == [self targetCell]) {
-                    [cell setCurrentStep:([cell currentStep] + 1)];
+                    NSInteger newStep = [cell currentStep] + 1;
+                    if (newStep >= kPSMTabDragAnimationSteps) {
+                        newStep = kPSMTabDragAnimationSteps - 1;
+                    }
+                    [cell setCurrentStep:newStep];
                 } else {
-                    [cell setCurrentStep:([cell currentStep] - 1)];
+                    NSInteger newStep = [cell currentStep] - 1;
+                    if (newStep < 0) {
+                        newStep = 0;
+                    }
+                    [cell setCurrentStep:newStep];
                     if([cell currentStep] > 0){
                         removeFlag = NO;
                     }
@@ -851,18 +1262,41 @@
         if ([control orientation] == PSMTabBarHorizontalOrientation) {
             newRect.origin.x = position;
             position += newRect.size.width;
+            // Only add intercell spacing after non-placeholder cells (real tabs).
+            // Placeholders only contribute their width, not additional spacing.
+            // This prevents a 1-point shift when placeholders transition from
+            // width 0 to width > 0.
+            if (![cell isPlaceholder]) {
+                position += [[control style] intercellSpacing];
+            }
         } else {
             newRect.origin.y = position;
             position += newRect.size.height;
+            // Only add intercell spacing after non-placeholder cells (real tabs).
+            if (![cell isPlaceholder]) {
+                position += [[control style] intercellSpacing];
+            }
         }
         [cell setFrame:newRect];
         if([cell indicator])
             [[cell indicator] setFrame:[[control style] indicatorRectForTabCell:cell]];
     }
+
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    CFAbsoluteTime cellLoopEnd = CFAbsoluteTimeGetCurrent();
+    NSLog(@"[PSMTabDrag] calculateDragAnimation breakdown: targetCell=%.2fms, cellLoop=%.2fms (%d cells)",
+          (targetCellEnd - targetCellStart) * 1000,
+          (cellLoopEnd - cellLoopStart) * 1000,
+          cellsProcessed);
+#endif
+
     if (removeFlag) {
         [_participatingTabBars removeObject:control];
         [self removeAllPlaceholdersFromTabBar:control];
     }
+#if PSM_DEBUG_DRAG_PERFORMANCE
+    os_signpost_interval_end(PSMTabDragLog(), OS_SIGNPOST_ID_EXCLUSIVE, "calculateDragAnimation", "");
+#endif
 }
 
 #pragma mark -
@@ -879,6 +1313,10 @@
     [[control cells] replaceObjectAtIndex:cellIndex withObject:pc];
     [[control cells] removeObjectAtIndex:(cellIndex + 1)];
     [[control cells] removeObjectAtIndex:(cellIndex - 1)];
+    // Set the expanded placeholder as the initial target to prevent the first
+    // animation frame from picking the wrong target when currentMouseLoc hasn't
+    // been set yet.
+    [self setTargetCell:pc];
     ILog(@"distributePlaceholdersInTabBar:withDraggedCell:%@", cell);
     return;
 }

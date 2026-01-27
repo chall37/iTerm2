@@ -1198,6 +1198,7 @@ extension PTYSession {
             KEY_SEND_IDLE_ALERT: nullValue,
             KEY_SEND_NEW_OUTPUT_ALERT: nullValue,
             KEY_SEND_TERMINAL_GENERATED_ALERT: nullValue,
+            KEY_SUPPRESS_ALERTS_IN_ACTIVE_SESSION: nullValue,
             KEY_ALLOW_CHANGE_CURSOR_BLINK: nullValue,
             KEY_LOAD_SHELL_INTEGRATION_AUTOMATICALLY: nullValue,
             KEY_AUTOMATICALLY_ENABLE_ALTERNATE_MOUSE_SCROLL: nullValue,
@@ -1481,5 +1482,20 @@ extension PTYSession {
                     "Archiving to \(location.displayName) failed: \(error.localizedDescription)")
             }
         }
+    }
+}
+
+extension PTYSession: AutomaticProfileSwitchingSessionDelegate {
+    func automaticProfileSwitchingSessionExpressionNeedEvaluation(_ session: AutomaticProfileSwitchingSession) {
+        if iTermProfilePreferences.bool(forKey: KEY_PREVENT_APS, inProfile: profile) {
+            return
+        }
+        automaticProfileSwitcher.markDirty()
+        automaticProfileSwitcher.setHostname(genericScope.value(forVariableName: iTermVariableKeySessionHostname) as? String,
+                                             username: genericScope.value(forVariableName: iTermVariableKeySessionUsername) as? String,
+                                             path: genericScope.value(forVariableName: iTermVariableKeySessionPath) as? String,
+                                             job: genericScope.value(forVariableName: iTermVariableKeySessionJob) as? String,
+                                             commandLine: genericScope.value(forVariableName: iTermVariableKeySessionCommandLine) as? String,
+                                             expressionValueProvider: apsContext)
     }
 }

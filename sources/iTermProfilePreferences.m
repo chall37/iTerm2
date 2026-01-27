@@ -237,7 +237,8 @@ typedef struct {
                              KEY_DYNAMIC_PROFILE_PARENT_GUID,
                              KEY_DYNAMIC_PROFILE_FILENAME, KEY_TMUX_PANE_TITLE,
                              KEY_SUBTITLE, KEY_CUSTOM_LOCALE, KEY_INITIAL_URL,
-                             KEY_BROWSER_EXTENSIONS_ROOT, KEY_BROWSER_EXTENSION_ACTIVE_IDS];
+                             KEY_BROWSER_EXTENSIONS_ROOT, KEY_BROWSER_EXTENSION_ACTIVE_IDS,
+                             KEY_PROGRESS_BAR_COLOR_SCHEME];
 
         NSArray *color = @[ KEY_FOREGROUND_COLOR, KEY_BACKGROUND_COLOR, KEY_BOLD_COLOR,
                             KEY_LINK_COLOR, KEY_MATCH_COLOR, KEY_SELECTION_COLOR, KEY_SELECTED_TEXT_COLOR,
@@ -312,6 +313,7 @@ typedef struct {
             KEY_BOOKMARK_USER_NOTIFICATIONS, KEY_SEND_BELL_ALERT, KEY_SEND_IDLE_ALERT,
             KEY_SEND_NEW_OUTPUT_ALERT, KEY_SEND_SESSION_ENDED_ALERT,
             KEY_SEND_TERMINAL_GENERATED_ALERT, KEY_FLASHING_BELL, KEY_VISUAL_BELL,
+            KEY_SUPPRESS_ALERTS_IN_ACTIVE_SESSION,
 
             KEY_REDUCE_FLICKER, KEY_SHOW_STATUS_BAR, KEY_SEND_CODE_WHEN_IDLE,
             KEY_APPLICATION_KEYPAD_ALLOWED, KEY_ALLOW_MODIFY_OTHER_KEYS,
@@ -384,7 +386,7 @@ typedef struct {
             KEY_SCREEN, KEY_SET_LOCALE_VARS, KEY_SPACE,
             KEY_TITLE_COMPONENTS,
             KEY_WINDOW_TYPE,
-            KEY_PROGRESS_BAR_HEIGHT, KEY_PROGRESS_BAR_COLOR_SCHEME,
+            KEY_PROGRESS_BAR_HEIGHT,
             KEY_TIMESTAMPS_STYLE,
 
             KEY_COMPOSER_TOP_OFFSET,
@@ -713,6 +715,7 @@ typedef struct {
             KEY_SEND_NEW_OUTPUT_ALERT:                              @"Whether to send notification on new output",
             KEY_SEND_SESSION_ENDED_ALERT:                           @"Whether to send notification when session ends",
             KEY_SEND_TERMINAL_GENERATED_ALERT:                      @"Whether to send notifications triggered by escape sequences",
+            KEY_SUPPRESS_ALERTS_IN_ACTIVE_SESSION:                  @"Whether to suppress alerts sent by the active session",
             KEY_FLASHING_BELL:                                      @"Whether to flash the screen on bell",
             KEY_VISUAL_BELL:                                        @"Whether to show visual indicator on bell",
             KEY_SET_LOCALE_VARS:                                    @"How to set locale environment variables",
@@ -1029,6 +1032,7 @@ typedef struct {
                   KEY_SEND_NEW_OUTPUT_ALERT: @NO,
                   KEY_SEND_SESSION_ENDED_ALERT: @YES,
                   KEY_SEND_TERMINAL_GENERATED_ALERT: @YES,
+                  KEY_SUPPRESS_ALERTS_IN_ACTIVE_SESSION: @NO,
                   KEY_FLASHING_BELL: @NO,
                   KEY_VISUAL_BELL: @NO,
                   KEY_SET_LOCALE_VARS: @(iTermSetLocalVarsModeSetAutomatically),

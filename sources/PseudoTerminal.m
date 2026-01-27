@@ -2690,6 +2690,11 @@ ITERM_WEAKLY_REFERENCEABLE
                                              fromSessionWithGUID:sender];
 }
 
+- (BOOL)sessionIsBroadcastSource:(PTYSession *)session {
+    return ([_broadcastInputHelper.sources containsObject:session.guid] &&  // Is a source
+            [_broadcastInputHelper shouldBroadcastToSessionWithID:session.guid fromSessionWithGUID:nil]); // Belongs to a domain
+}
+
 - (BOOL)broadcastInputHelper:(iTermBroadcastInputHelper *)helper tabWithSessionIsBroadcasting:(NSString *)sessionID {
     PTYSession *session = [[iTermController sharedInstance] sessionWithGUID:sessionID];
     if (!session) {
@@ -9099,11 +9104,9 @@ static CGFloat iTermDimmingAmount(PSMTabBarControl *tabView) {
     }
     PTYSession *currentSession = [self currentSession];
     if (currentSession) {
-        [currentSession asyncInitialDirectoryForNewSessionBasedOnCurrentDirectory:^(NSString *oldCWD) {
+        [currentSession asyncInitialDirectoryForNewSessionBasedOnCurrentDirectoryWithSSHIdentity:theBookmark.sshIdentity
+                                                                                       completion:^(NSString *oldCWD) {
             DLog(@"Get local pwd so I can split: %@", oldCWD);
-            if (theBookmark.sshIdentity != nil && ![currentSession.sshIdentity isEqualTo:theBookmark.sshIdentity]) {
-                oldCWD = nil;
-            }
             PTYSession *session = [self splitVertically:isVertical
                                                  before:before
                                                 profile:theBookmark
@@ -11472,18 +11475,20 @@ typedef NS_ENUM(NSUInteger, iTermBroadcastCommand) {
 }
 
 - (IBAction)toggleBroadcastSource:(id)sender {
-    NSString *session = self.currentSession.guid;
+    PTYSession *session = self.currentSession;
+    NSString *sessionID = session.guid;
 
     // Start by removing every session in this domain from broadcast sources.
     NSSet<NSString *> *sources = _broadcastInputHelper.sources;
-    const BOOL wasSender = [sources containsObject:session];
-    NSSet<NSString *> *domainMembers = [_broadcastInputHelper domainContainingSession:session];
+    const BOOL wasSender = [sources containsObject:sessionID];
+    NSSet<NSString *> *domainMembers = [_broadcastInputHelper domainContainingSession:sessionID];
     sources = [sources it_setBySubtractingSet:domainMembers];
 
     if (!wasSender) {
         // Make this session the sender.
         sources = [sources setByAddingObject:self.currentSession.guid];
     }
+    session.variablesScope.isBroadcastSource = !wasSender;
 
     _broadcastInputHelper.sources = sources;
 }
@@ -12049,14 +12054,12 @@ typedef NS_ENUM(NSUInteger, iTermBroadcastCommand) {
     }
 
     __weak __typeof(self) weakSelf = self;
-    [currentSession asyncInitialDirectoryForNewSessionBasedOnCurrentDirectory:^(NSString *pwd) {
+    [currentSession asyncInitialDirectoryForNewSessionBasedOnCurrentDirectoryWithSSHIdentity:profile.sshIdentity
+                                                                                   completion:^(NSString *pwd) {
         DLog(@"Got local pwd so I can create a tab: %@", pwd);
         PseudoTerminal *strongSelf = [[weakSelf retain] autorelease];
         if (!strongSelf) {
             return;
-        }
-        if (profile.sshIdentity != nil && ![currentSession.sshIdentity isEqual:profile.sshIdentity]) {
-            pwd = nil;
         }
         PTYSession *newSession = [strongSelf createTabWithProfile:profile
                                                       withCommand:command

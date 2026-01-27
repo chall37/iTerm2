@@ -63,15 +63,7 @@ NSString *VT100ScreenTerminalStateKeyPath = @"Path";
     id<iTermMarkCacheReading> _markCache;
 }
 
-@synthesize audibleBell = _audibleBell;
-@synthesize showBellIndicator = _showBellIndicator;
-@synthesize flashBell = _flashBell;
-@synthesize postUserNotifications = _postUserNotifications;
-@synthesize cursorBlinks = _cursorBlinks;
-@synthesize collectInputForPrinting = _collectInputForPrinting;
 @synthesize printBuffer = _printBuffer;
-@synthesize allowTitleReporting = _allowTitleReporting;
-@synthesize allowAlternateMouseScroll = _allowAlternateMouseScroll;
 @synthesize lastBell = _lastBell;
 @synthesize pasteboardString = _pasteboardString;
 @synthesize intervalTree = _intervalTree;
@@ -185,15 +177,7 @@ NSString *VT100ScreenTerminalStateKeyPath = @"Path";
 }
 
 - (void)copyFastStuffFrom:(VT100ScreenMutableState *)source {
-    _audibleBell = source.audibleBell;
-    _showBellIndicator = source.showBellIndicator;
-    _flashBell = source.flashBell;
-    _postUserNotifications = source.postUserNotifications;
-    _cursorBlinks = source.cursorBlinks;
-    _collectInputForPrinting = source.collectInputForPrinting;
     _printBuffer = [source.printBuffer copy];
-    _allowTitleReporting = source.allowTitleReporting;
-    _allowAlternateMouseScroll = source.allowAlternateMouseScroll;
     _lastBell = source.lastBell;
     _wraparoundMode = source.wraparoundMode;
     _ansi = source.ansi;
