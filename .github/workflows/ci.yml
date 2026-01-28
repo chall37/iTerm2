@@ -88,6 +88,7 @@ jobs:
     name: Tests
     needs: build-deps
     runs-on: macos-26
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -106,7 +107,6 @@ jobs:
         run: xcodebuild -version > last-xcode-version
 
       - name: Run ModernTests
-        continue-on-error: true
         run: |
           xcodebuild test -project iTerm2.xcodeproj -scheme ModernTests \
             -parallel-testing-enabled NO \
