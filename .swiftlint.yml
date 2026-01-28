@@ -1,0 +1,62 @@
+# SwiftLint Configuration - Lenient Start
+# Focused on catching obvious issues without blocking existing code
+
+excluded:
+  - ThirdParty
+  - sources/CoreDataGeneratedFiles
+  - build
+  - .build
+  - DerivedData
+  - ModernTests
+  - iTerm2Tests
+  - iTerm2XCTests
+  - WebExtensionsFramework/Tests
+
+# Relaxed line length (existing code has long lines)
+line_length:
+  warning: 200
+  error: 500
+  ignores_comments: true
+  ignores_urls: true
+
+# Relaxed file length
+file_length:
+  warning: 1000
+  error: 5000
+
+# Relaxed type body length
+type_body_length:
+  warning: 500
+  error: 2000
+
+# Relaxed function body length
+function_body_length:
+  warning: 100
+  error: 300
+
+# Disable rules that would be too noisy on existing codebase
+disabled_rules:
+  - trailing_comma
+  - identifier_name
+  - type_name
+  - nesting
+  - cyclomatic_complexity
+  - function_parameter_count
+  - large_tuple
+  - opening_brace
+  - statement_position
+  - vertical_whitespace
+  - shorthand_operator
+  - duplicate_conditions
+
+# Enable useful rules as warnings
+opt_in_rules:
+  - empty_count
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+
+# Force unwrap/cast as warnings only
+force_cast: warning
+force_try: warning
+force_unwrapping: warning
+empty_count: warning
