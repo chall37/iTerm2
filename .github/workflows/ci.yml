@@ -33,7 +33,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ThirdParty
-          key: thirdparty-xcode-${{ env.XCODE_VERSION }}-${{ hashFiles('submodules/SwiftyMarkdown/**', 'submodules/Highlightr/**') }}
+          key: thirdparty-xcode-${{ env.XCODE_VERSION }}-${{ hashFiles('.gitmodules') }}
 
       - name: Build Swift dependencies
         if: steps.cache-thirdparty.outputs.cache-hit != 'true'
@@ -82,7 +82,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ThirdParty
-          key: thirdparty-xcode-${{ env.XCODE_VERSION }}-${{ hashFiles('submodules/SwiftyMarkdown/**', 'submodules/Highlightr/**') }}
+          key: thirdparty-xcode-${{ env.XCODE_VERSION }}-${{ hashFiles('.gitmodules') }}
 
       - name: Build Swift dependencies
         if: steps.cache-thirdparty.outputs.cache-hit != 'true'
@@ -141,7 +141,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ThirdParty
-          key: thirdparty-xcode-${{ env.XCODE_VERSION }}-${{ hashFiles('submodules/SwiftyMarkdown/**', 'submodules/Highlightr/**') }}
+          key: thirdparty-xcode-${{ env.XCODE_VERSION }}-${{ hashFiles('.gitmodules') }}
 
       - name: Build Swift dependencies
         if: steps.cache-thirdparty.outputs.cache-hit != 'true'
