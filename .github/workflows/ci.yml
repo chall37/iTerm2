@@ -9,17 +9,9 @@ env:
   XCODE_VERSION: "26.2"
 
 jobs:
-  build:
-    name: Build (${{ matrix.configuration }})
+  build-deps:
+    name: Build Dependencies
     runs-on: macos-15
-    strategy:
-      matrix:
-        configuration: [Development, Deployment]
-        include:
-          - configuration: Development
-            extra_flags: ""
-          - configuration: Deployment
-            extra_flags: "ENABLE_ADDRESS_SANITIZER=NO"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,6 +47,32 @@ jobs:
           rm -rf ../../ThirdParty/Highlightr.framework
           cp -R Build/Release/Highlightr.framework ../../ThirdParty/
 
+  build:
+    name: Build (${{ matrix.configuration }})
+    needs: build-deps
+    runs-on: macos-15
+    strategy:
+      matrix:
+        configuration: [Development, Deployment]
+        include:
+          - configuration: Development
+            extra_flags: ""
+          - configuration: Deployment
+            extra_flags: "ENABLE_ADDRESS_SANITIZER=NO"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Select Xcode ${{ env.XCODE_VERSION }}
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app/Contents/Developer
+
+      - name: Restore ThirdParty cache
+        uses: actions/cache@v4
+        with:
+          path: ThirdParty
+          key: thirdparty-xcode-${{ env.XCODE_VERSION }}-${{ hashFiles('.gitmodules') }}
+
       - name: Update Xcode version marker
         run: xcodebuild -version > last-xcode-version
 
@@ -68,6 +86,7 @@ jobs:
 
   test:
     name: Tests
+    needs: build-deps
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -77,30 +96,11 @@ jobs:
       - name: Select Xcode ${{ env.XCODE_VERSION }}
         run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app/Contents/Developer
 
-      - name: Cache ThirdParty frameworks
-        id: cache-thirdparty
+      - name: Restore ThirdParty cache
         uses: actions/cache@v4
         with:
           path: ThirdParty
           key: thirdparty-xcode-${{ env.XCODE_VERSION }}-${{ hashFiles('.gitmodules') }}
-
-      - name: Build Swift dependencies
-        if: steps.cache-thirdparty.outputs.cache-hit != 'true'
-        run: |
-          cd submodules/SwiftyMarkdown
-          xcodebuild -configuration Release \
-            'CONFIGURATION_BUILD_DIR=$(SRCROOT)/Build/Release' \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=""
-          rm -rf ../../ThirdParty/SwiftyMarkdown.framework
-          cp -R Build/Release/SwiftyMarkdown.framework ../../ThirdParty/
-
-          cd ../Highlightr
-          xcodebuild -project Highlightr.xcodeproj -target Highlightr-macOS \
-            -configuration Release \
-            'CONFIGURATION_BUILD_DIR=$(SRCROOT)/Build/Release' \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=""
-          rm -rf ../../ThirdParty/Highlightr.framework
-          cp -R Build/Release/Highlightr.framework ../../ThirdParty/
 
       - name: Update Xcode version marker
         run: xcodebuild -version > last-xcode-version
@@ -127,6 +127,7 @@ jobs:
 
   analyze:
     name: Static Analysis
+    needs: build-deps
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -136,30 +137,11 @@ jobs:
       - name: Select Xcode ${{ env.XCODE_VERSION }}
         run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app/Contents/Developer
 
-      - name: Cache ThirdParty frameworks
-        id: cache-thirdparty
+      - name: Restore ThirdParty cache
         uses: actions/cache@v4
         with:
           path: ThirdParty
           key: thirdparty-xcode-${{ env.XCODE_VERSION }}-${{ hashFiles('.gitmodules') }}
-
-      - name: Build Swift dependencies
-        if: steps.cache-thirdparty.outputs.cache-hit != 'true'
-        run: |
-          cd submodules/SwiftyMarkdown
-          xcodebuild -configuration Release \
-            'CONFIGURATION_BUILD_DIR=$(SRCROOT)/Build/Release' \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=""
-          rm -rf ../../ThirdParty/SwiftyMarkdown.framework
-          cp -R Build/Release/SwiftyMarkdown.framework ../../ThirdParty/
-
-          cd ../Highlightr
-          xcodebuild -project Highlightr.xcodeproj -target Highlightr-macOS \
-            -configuration Release \
-            'CONFIGURATION_BUILD_DIR=$(SRCROOT)/Build/Release' \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=""
-          rm -rf ../../ThirdParty/Highlightr.framework
-          cp -R Build/Release/Highlightr.framework ../../ThirdParty/
 
       - name: Update Xcode version marker
         run: xcodebuild -version > last-xcode-version
