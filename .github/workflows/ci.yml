@@ -11,7 +11,7 @@ env:
 jobs:
   build-deps:
     name: Build Dependencies
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,7 +50,7 @@ jobs:
   build:
     name: Build (${{ matrix.configuration }})
     needs: build-deps
-    runs-on: macos-15
+    runs-on: macos-26
     strategy:
       matrix:
         configuration: [Development, Deployment]
@@ -87,7 +87,7 @@ jobs:
   test:
     name: Tests
     needs: build-deps
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
         with:
@@ -114,7 +114,7 @@ jobs:
 
   swiftlint:
     name: SwiftLint
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
@@ -128,7 +128,7 @@ jobs:
   analyze:
     name: Static Analysis
     needs: build-deps
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
         with:
