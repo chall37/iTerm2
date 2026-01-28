@@ -106,10 +106,13 @@ jobs:
 
       - name: Build
         run: |
+          # Build may fail on Metal shaders due to CodeQL tracer + cryptex
+          # incompatibility (actions/runner-images#13014). Partial build is
+          # sufficient for CodeQL analysis of C/ObjC/Swift source.
           xcodebuild -scheme iTerm2 -configuration Development \
             -destination 'platform=macOS' \
             -skipPackagePluginValidation \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO || true
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
