@@ -41,15 +41,6 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
-          upload: never
-          output: sarif-results
-
-      - name: Upload SARIF (push only)
-        if: github.event_name != 'pull_request'
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: sarif-results
-          category: "/language:${{ matrix.language }}"
 
   analyze-compiled:
     name: Analyze (${{ matrix.language }})
@@ -126,13 +117,4 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
         with:
-          category: "/language:${{ matrix.language }}"
-          upload: never
-          output: sarif-results
-
-      - name: Upload SARIF (push only)
-        if: github.event_name != 'pull_request'
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: sarif-results
           category: "/language:${{ matrix.language }}"
