@@ -58,6 +58,7 @@
 #import "iTermHapticActuator.h"
 #import "iTermHistogram.h"
 #import "iTermHotKeyController.h"
+#import "MTPerfMetrics.h"
 #import "iTermInitialDirectory.h"
 #import "iTermKeyLabels.h"
 #import "iTermLoggingHelper.h"
@@ -381,7 +382,15 @@ typedef NS_ENUM(NSUInteger, PTYSessionTurdType) {
 @interface PTYSession(AppSwitching)<iTermAppSwitchingPreventionDetectorDelegate>
 @end
 
+#if ENABLE_MTPERF
+@interface PTYSession () <MTPerfSession>
+@end
+#endif
+
 @implementation PTYSession {
+#if ENABLE_MTPERF
+    uint64_t _mtperfStartTimes[MTPerfMetricCount];
+#endif
     NSString *_termVariable;
 
     // Has the underlying connection been closed?
@@ -705,6 +714,12 @@ typedef NS_ENUM(NSUInteger, PTYSessionTurdType) {
     assert(NO);
     return [self initSynthetic:NO];
 }
+
+#if ENABLE_MTPERF
+- (uint64_t *)mtperfStartTimes {
+    return _mtperfStartTimes;
+}
+#endif
 
 - (instancetype)initSynthetic:(BOOL)synthetic {
     self = [super init];
@@ -4397,6 +4412,7 @@ webViewConfiguration:(WKWebViewConfiguration *)webViewConfiguration
 }
 
 - (void)insertText:(NSString *)string {
+    MTPerfStartSession(MTPerfMetricKeyboardInput, (__bridge void *)self);
     if (_exited) {
         return;
     }
@@ -5566,6 +5582,7 @@ webViewConfiguration:(WKWebViewConfiguration *)webViewConfiguration
 }
 
 - (void)setIconName:(NSString *)theName {
+    MTPerfStartSession(MTPerfMetricTabTitleUpdate, (__bridge void *)self);
     DLog(@"Assign to autoNameFormat <- %@", theName);
     [self.variablesScope setValuesFromDictionary:@{ iTermVariableKeySessionAutoNameFormat: theName ?: [NSNull null],
                                                     iTermVariableKeySessionIconName: theName ?: [NSNull null] }];
@@ -5582,6 +5599,7 @@ webViewConfiguration:(WKWebViewConfiguration *)webViewConfiguration
 }
 
 - (void)setWindowTitle:(NSString *)title {
+    // Note: TitleUpdate latency is measured in PseudoTerminal.setWindowTitle where start/end are in same call stack
     [self.variablesScope setValue:title forVariableNamed:iTermVariableKeySessionWindowName];
     _titleDirty = YES;
     [_tmuxTitleMonitor updateOnce];
@@ -13973,11 +13991,12 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
 }
 
 - (void)screenSetWindowTitle:(NSString *)title {
+    MTPerfStartSession(MTPerfMetricTitleUpdate, (__bridge void *)self);
     // The window name doesn't normally serve as an interpolated string, but just to be extra safe
     // break up \(.
     title = [title stringByReplacingOccurrencesOfString:@"\\(" withString:@"\\\u200B("];
     [self setWindowTitle:title];
-    [self.delegate sessionDidSetWindowTitle:title];
+    [self.delegate sessionDidSetWindowTitle:title forSession:self];
 }
 
 - (NSString *)screenWindowTitle {
@@ -18650,6 +18669,11 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
 
 - (void)updateCadenceControllerUpdateDisplay:(iTermUpdateCadenceController *)controller {
     DLog(@"Cadence controller requests display");
+    if ([_delegate sessionBelongsToVisibleTab]) {
+        MTPerfIncrementCounter(MTPerfCounterVisibleRefresh);
+    } else {
+        MTPerfIncrementCounter(MTPerfCounterBackgroundRefresh);
+    }
     [self updateDisplayBecause:@"Cadence controller update"];
 }
 
