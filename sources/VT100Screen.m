@@ -110,6 +110,10 @@ const NSInteger VT100ScreenBigFileDownloadThreshold = 1024 * 1024 * 1024;
     return _state.shouldExpectPromptMarks;
 }
 
+- (BOOL)shouldExpectWorkingDirectoryUpdates {
+    return _state.shouldExpectWorkingDirectoryUpdates;
+}
+
 - (void)userDidPressReturn {
     DLog(@"userDidPressReturn");
     [self mutateAsynchronously:^(VT100Terminal * _Nonnull terminal,
@@ -458,6 +462,10 @@ additionalWordCharacters:(NSString *)additionalWordCharacters
     return [_state metadataOnLine:lineNumber];
 }
 
+- (BOOL)isFirstLineOfBlock:(int)lineNumber {
+    return [_state isFirstLineOfBlock:lineNumber];
+}
+
 - (iTermImmutableMetadata)metadataAtScreenIndex:(int)index {
     return [_state.currentGrid immutableMetadataAtLineNumber:index];
 }
@@ -772,7 +780,7 @@ additionalWordCharacters:(NSString *)additionalWordCharacters
     if (!mark) {
         return nil;
     }
-    if (!mark.hasCode) {
+    if (!mark.hasCode && ![self.delegate screenOffscreenCommandLineShouldBeVisibleForCurrentCommand]) {
         return nil;
     }
     const long long absLine = mark.commandRange.start.y;
@@ -892,8 +900,16 @@ additionalWordCharacters:(NSString *)additionalWordCharacters
     return [_state lastPromptMark];
 }
 
+- (id<VT100ScreenMarkReading>)lastScreenMark {
+    return [_state lastScreenMark];
+}
+
 - (id<VT100ScreenMarkReading>)firstPromptMark {
     return [_state firstPromptMark];
+}
+
+- (id<VT100ScreenMarkReading>)firstScreenMark {
+    return [_state firstScreenMark];
 }
 
 - (id<VT100ScreenMarkReading>)promptMarkWithGUID:(NSString *)guid {
@@ -1064,7 +1080,7 @@ additionalWordCharacters:(NSString *)additionalWordCharacters
     VT100GridAbsCoordRange range;
     range.start = [self absCoordRangeForInterval:mark.entry.interval].start;
 
-    id<VT100ScreenMarkReading> successor = [self promptMarkAfterPromptMark:mark];
+    id<VT100ScreenMarkReading> successor = [self promptMarkAfterScreenMark:mark];
     if (successor) {
         range.end = [self absCoordRangeForInterval:successor.entry.interval].start;
         range.end.y -= 1;
@@ -1093,12 +1109,16 @@ additionalWordCharacters:(NSString *)additionalWordCharacters
     return [_state commandMarkAtOrBeforeLine:line];
 }
 
-- (id<VT100ScreenMarkReading>)promptMarkAfterPromptMark:(id<VT100ScreenMarkReading>)predecessor {
-    return [_state promptMarkAfterPromptMark:predecessor];
+- (id<VT100ScreenMarkReading>)screenMarkAfterScreenMark:(id<VT100ScreenMarkReading>)predecessor {
+    return [_state screenMarkAfterScreenMark:predecessor];
 }
 
-- (id<VT100ScreenMarkReading>)promptMarkBeforePromptMark:(id<VT100ScreenMarkReading>)predecessor {
-    return [_state promptMarkBeforePromptMark:predecessor];
+- (id<VT100ScreenMarkReading>)promptMarkAfterScreenMark:(id<VT100ScreenMarkReading>)predecessor {
+    return [_state promptMarkAfterScreenMark:predecessor];
+}
+
+- (id<VT100ScreenMarkReading>)screenMarkBeforeScreenMark:(id<VT100ScreenMarkReading>)predecessor {
+    return [_state screenMarkBeforeScreenMark:predecessor];
 }
 
 - (void)removeNamedMark:(id<VT100ScreenMarkReading>)mark {

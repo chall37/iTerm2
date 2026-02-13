@@ -174,6 +174,9 @@ typedef NS_ENUM(NSUInteger, PTYSessionResizePermission) {
 - (void)screenSendReportData:(NSData * _Nonnull)data;
 - (void)screenDidSendAllPendingReports;
 
+// Send tmux-aware OSC 4 color report (for tmux 3.6+)
+- (void)screenSendTmuxOSC4Report:(NSData * _Nonnull)data;
+
 // Returns the visible frame of the display the screen's window is in.
 - (NSRect)screenWindowScreenFrame;
 
@@ -321,6 +324,12 @@ typedef NS_ENUM(NSUInteger, PTYSessionResizePermission) {
 - (void)screenCurrentDirectoryDidChangeTo:(NSString * _Nullable)newPath
                                remoteHost:(id<VT100RemoteHostReading> _Nullable)remoteHost;
 
+// Poll for the local working directory and update lastLocalDirectory only.
+// Does not affect the interval tree, shell history, or path variable.
+// Used when OSC 7/shell integration is providing directory updates but we still
+// want to track the local directory for session restoration.
+- (void)screenPollLocalDirectoryOnly;
+
 - (void)screenDidReceiveCustomEscapeSequenceWithParameters:(NSDictionary<NSString *, NSString *> * _Nonnull)parameters
                                                    payload:(NSString * _Nonnull)payload;
 - (void)screenReportVariableNamed:(NSString * _Nonnull)name;
@@ -460,5 +469,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionResizePermission) {
             completion:(void (^ _Nonnull)(int32_t, const struct stat * _Nonnull))completion;
 - (void)screenStartWrappedCommand:(NSString * _Nonnull)command channel:(NSString * _Nonnull)uid;
 - (void)screenExecDidFail;
+- (BOOL)screenOffscreenCommandLineShouldBeVisibleForCurrentCommand;
+- (void)screenUpdateBlock:(NSString * _Nonnull)blockID action:(iTermUpdateBlockAction)action;
 
 @end

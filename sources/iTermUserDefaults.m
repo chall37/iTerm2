@@ -6,11 +6,15 @@
 //
 
 #import "iTermUserDefaults.h"
+
+#import "DebugLogging.h"
 #import "iTermAdvancedSettingsModel.h"
 #import "NSArray+iTerm.h"
 #import "NSObject+iTerm.h"
 
 NSString *const kSelectionRespectsSoftBoundariesKey = @"Selection Respects Soft Boundaries";
+static NSString *gCustomSuiteName = nil;
+static BOOL gUserDefaultsInitialized = NO;
 static NSString *const iTermSecureKeyboardEntryEnabledUserDefaultsKey = @"Secure Input";
 // Set to YES after warning the user about respecting the dock setting to prefer tabs over windows.
 static NSString *const kPreferenceKeyHaveBeenWarnedAboutTabDockSetting = @"NoSyncHaveBeenWarnedAboutTabDockSetting";
@@ -31,8 +35,18 @@ static NSString *const iTermUserDefaultsKeyLastSystemPythonVersionRequirement = 
 static NSString *const iTermUserDefaultsKeyProbeForPassword = @"ProbeForPassword";
 static NSString *const iTermUserDefaultsKeyImportPath = @"ImportPath";
 static NSString *const iTermUserDefaultsKeyShouldSendReturnAfterPassword = @"ShouldSendReturnAfterPassword";
+static NSString *const iTermUserDefaultsKeyWindowCornerRadiusCache = @"NoSyncWindowCornerRadiusCache";
 
 @implementation iTermUserDefaults
+
++ (void)setCustomSuiteName:(NSString *)suiteName {
+    ITAssertWithMessage(!gUserDefaultsInitialized, @"setCustomSuiteName: called after userDefaults was already accessed");
+    gCustomSuiteName = [suiteName copy];
+}
+
++ (NSString *)customSuiteName {
+    return gCustomSuiteName;
+}
 
 static NSArray *iTermUserDefaultsGetTypedArray(NSUserDefaults *userDefaults, Class objectClass, NSString *key) {
     return [[NSArray castFrom:[userDefaults objectForKey:iTermUserDefaultsKeySearchHistory]] mapWithBlock:^id(id anObject) {
@@ -51,7 +65,13 @@ static NSUserDefaults *iTermPrivateUserDefaults(void) {
     static dispatch_once_t onceToken;
     static NSUserDefaults *privateUserDefaults;
     dispatch_once(&onceToken, ^{
-        privateUserDefaults = [[NSUserDefaults alloc] initWithSuiteName:@"com.googlecode.iterm2.private"];
+        NSString *suiteName;
+        if (gCustomSuiteName) {
+            suiteName = [gCustomSuiteName stringByAppendingString:@".private"];
+        } else {
+            suiteName = @"com.googlecode.iterm2.private";
+        }
+        privateUserDefaults = [[NSUserDefaults alloc] initWithSuiteName:suiteName];
     });
     return privateUserDefaults;
 }
@@ -60,7 +80,12 @@ static NSUserDefaults *iTermPrivateUserDefaults(void) {
     static NSUserDefaults *userDefaults;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        userDefaults = [NSUserDefaults standardUserDefaults];
+        gUserDefaultsInitialized = YES;
+        if (gCustomSuiteName) {
+            userDefaults = [[NSUserDefaults alloc] initWithSuiteName:gCustomSuiteName];
+        } else {
+            userDefaults = [NSUserDefaults standardUserDefaults];
+        }
         [userDefaults registerDefaults:@{ iTermUserDefaultsKeyOpenTmuxDashboardIfHiddenWindows: @YES,
                                           iTermUserDefaultsKeyShouldSendReturnAfterPassword: @YES }];
     });
@@ -241,6 +266,15 @@ static NSUserDefaults *iTermPrivateUserDefaults(void) {
 + (void)setShouldSendReturnAfterPassword:(BOOL)shouldSendReturnAfterPassword {
     [self.userDefaults setBool:shouldSendReturnAfterPassword
                         forKey:iTermUserDefaultsKeyShouldSendReturnAfterPassword];
+}
+
++ (NSDictionary<NSString *, NSNumber *> *)windowCornerRadiusCache {
+    return [self.userDefaults objectForKey:iTermUserDefaultsKeyWindowCornerRadiusCache];
+}
+
++ (void)setWindowCornerRadiusCache:(NSDictionary<NSString *, NSNumber *> *)windowCornerRadiusCache {
+    [self.userDefaults setObject:windowCornerRadiusCache
+                          forKey:iTermUserDefaultsKeyWindowCornerRadiusCache];
 }
 
 @end

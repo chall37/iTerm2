@@ -100,6 +100,10 @@ typedef NS_ENUM(NSUInteger, VT100TerminalProtectedMode) {
 // Sends a report.
 - (void)terminalSendReport:(NSData *)report;
 
+// Sends an OSC 4 color query report (tmux-aware).
+// For tmux clients running 3.6+, this routes through the tmux controller.
+- (void)terminalSendOSC4Report:(NSData *)report;
+
 - (VT100OutputOptionalDeviceAttributes)terminalOptionalDeviceAttributes;
 
 // Replaces the screen contents with a test pattern.
@@ -548,7 +552,16 @@ typedef NS_ENUM(NSUInteger, VT100TerminalProtectedMode) {
 - (void)terminal:(VT100Terminal *)terminal willExecuteToken:(VT100Token *)token defaultChar:(const screen_char_t *)defaultChar encoding:(NSStringEncoding)encoding;
 - (void)terminalOpenURL:(NSURL *)url;
 - (void)terminalBlock:(NSString *)blockID start:(BOOL)start type:(NSString *)type render:(BOOL)render;
+
+typedef NS_ENUM(NSUInteger, iTermUpdateBlockAction) {
+    iTermUpdateBlockActionFold,
+    iTermUpdateBlockActionUnfold
+};
+
+- (void)terminalUpdateBlock:(NSString *)blockID action:(iTermUpdateBlockAction)action;
 - (void)terminalInsertCopyButtonForBlock:(NSString *)blockID;
+- (void)terminalInsertCustomButtonWithCode:(int)code icon:(NSString *)icon;
+- (void)terminalInvalidateCustomButtons;
 - (void)terminalSetPointerShape:(NSString *)pointerShape;
 - (void)terminalDidReceiveKittyImageCommand:(iTermKittyImageCommand *)kittyImageCommand;
 - (void)terminalStartWrappedCommand:(NSString *)command channel:(NSString *)uid;

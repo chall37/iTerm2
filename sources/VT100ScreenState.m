@@ -104,6 +104,7 @@ NSString *VT100ScreenTerminalStateKeyPath = @"Path";
 @synthesize fakePromptDetectedAbsLine = _fakePromptDetectedAbsLine;
 @synthesize lastPromptLine = _lastPromptLine;
 @synthesize shouldExpectPromptMarks = _shouldExpectPromptMarks;
+@synthesize shouldExpectWorkingDirectoryUpdates = _shouldExpectWorkingDirectoryUpdates;
 @synthesize echoProbeIsActive = _echoProbeIsActive;
 @synthesize terminalSoftAlternateScreenMode = _terminalSoftAlternateScreenMode;
 @synthesize terminalMouseMode = _terminalMouseMode;
@@ -206,6 +207,7 @@ NSString *VT100ScreenTerminalStateKeyPath = @"Path";
     _intervalTreeObserver = source.intervalTreeObserver;
     _lastCommandMark = [source.cachedLastCommandMark doppelganger];
     _shouldExpectPromptMarks = source.shouldExpectPromptMarks;
+    _shouldExpectWorkingDirectoryUpdates = source.shouldExpectWorkingDirectoryUpdates;
     _echoProbeIsActive = source.echoProbe.isActive;
     _terminalSoftAlternateScreenMode = source.terminalSoftAlternateScreenMode;
     _terminalMouseMode = source.terminalMouseMode;
@@ -1083,7 +1085,7 @@ static NSRange NSRangeFromBounds(NSInteger lowerBound, NSInteger upperBound) {
     }];
 }
 
-- (id<VT100ScreenMarkReading>)promptMarkAfterPromptMark:(id<VT100ScreenMarkReading>)predecessor {
+- (id<VT100ScreenMarkReading>)promptMarkAfterScreenMark:(id<VT100ScreenMarkReading>)predecessor {
     if (!predecessor) {
         return nil;
     }
@@ -1104,7 +1106,24 @@ static NSRange NSRangeFromBounds(NSInteger lowerBound, NSInteger upperBound) {
     return nil;
 }
 
-- (id<VT100ScreenMarkReading> _Nullable)promptMarkBeforePromptMark:(id<VT100ScreenMarkReading>)successor {
+- (id<VT100ScreenMarkReading>)screenMarkAfterScreenMark:(id<VT100ScreenMarkReading>)predecessor {
+    if (!predecessor) {
+        return nil;
+    }
+    const long long pos = MAX(0, predecessor.entry.interval.limit);
+
+    for (NSArray *objects in [self.intervalTree forwardLocationEnumeratorAt:pos]) {
+        id<VT100ScreenMarkReading> mark = [objects objectPassingTest:^BOOL(id element, NSUInteger index, BOOL *stop) {
+            return [element conformsToProtocol:@protocol(VT100ScreenMarkReading)];
+        }];
+        if (mark) {
+            return mark;
+        }
+    }
+    return nil;
+}
+
+- (id<VT100ScreenMarkReading> _Nullable)screenMarkBeforeScreenMark:(id<VT100ScreenMarkReading>)successor {
     if (!successor) {
         return nil;
     }
@@ -1112,11 +1131,7 @@ static NSRange NSRangeFromBounds(NSInteger lowerBound, NSInteger upperBound) {
 
     for (NSArray *objects in [self.intervalTree reverseEnumeratorAt:pos]) {
         id<VT100ScreenMarkReading> mark = [objects objectPassingTest:^BOOL(id element, NSUInteger index, BOOL *stop) {
-            if (![element conformsToProtocol:@protocol(VT100ScreenMarkReading)]) {
-                return NO;
-            }
-            id<VT100ScreenMarkReading> temp = element;
-            return temp.isPrompt;
+            return [element conformsToProtocol:@protocol(VT100ScreenMarkReading)];
         }];
         if (mark) {
             return mark;
@@ -1242,6 +1257,14 @@ static NSRange NSRangeFromBounds(NSInteger lowerBound, NSInteger upperBound) {
 
 - (id<VT100ScreenMarkReading>)firstPromptMark {
     return (id<VT100ScreenMarkReading>)[self firstMarkMustBePrompt:YES class:[VT100ScreenMark class]];
+}
+
+- (id<VT100ScreenMarkReading>)firstScreenMark {
+    return (id<VT100ScreenMarkReading>)[self firstMarkMustBePrompt:NO class:[VT100ScreenMark class]];
+}
+
+- (id<VT100ScreenMarkReading>)lastScreenMark {
+    return (id<VT100ScreenMarkReading>)[self lastMarkMustBePrompt:NO class:[VT100ScreenMark class]];
 }
 
 #pragma mark - Colors
@@ -1446,6 +1469,15 @@ static NSRange NSRangeFromBounds(NSInteger lowerBound, NSInteger upperBound) {
         return nil;
     }
     return [NSDate dateWithTimeIntervalSinceReferenceDate:timestamp];
+}
+
+- (BOOL)isFirstLineOfBlock:(int)line {
+    const NSInteger numLinesInLineBuffer = [self.linebuffer numLinesWithWidth:self.currentGrid.size.width];
+    if (line >= numLinesInLineBuffer) {
+        // Lines in the current grid are not part of any block.
+        return NO;
+    }
+    return [self.linebuffer isFirstLineOfBlock:line width:self.currentGrid.size.width];
 }
 
 #pragma mark - VT100GridDelgate

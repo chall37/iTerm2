@@ -543,6 +543,27 @@ typedef struct {
     }
 }
 
+- (void)terminalSendOSC4Report:(NSData *)report {
+    DLog(@"begin OSC 4 report %@", report);
+    if (!report) {
+        return;
+    }
+    if (!self.config.isTmuxClient) {
+        DLog(@"non-tmux");
+        // Non-tmux: use normal report path
+        [self terminalSendReport:report];
+        return;
+    }
+    DLog(@"Sending report");
+    // tmux: dispatch to session for tmux-specific handling (3.6+)
+    [self willSendReport];
+    __weak __typeof(self) weakSelf = self;
+    [self addSideEffect:^(id<VT100ScreenDelegate> delegate) {
+        [delegate screenSendTmuxOSC4Report:report];
+        [weakSelf didSendReport:delegate];
+    } name:@"OSC 4 tmux report"];
+}
+
 - (void)terminalShowTestPattern {
     DLog(@"begin");
     screen_char_t ch = [self.currentGrid defaultChar];
@@ -894,6 +915,18 @@ typedef struct {
     // changes shouldn't override CurrentDirectory.
     if ([self remoteHostOnLine:self.numberOfScrollbackLines + self.height]) {
         DLog(@"Already have a remote host so not updating working directory because of title change");
+        return;
+    }
+    // If OSC 7 or shell integration has provided working directory updates, don't update the
+    // interval tree or shell history from window title changes. This prevents the local pwd from
+    // overwriting the remote directory when SSHed with a shell like fish that sends OSC 7 without
+    // a hostname. However, we still poll for the local directory so it can be used when creating
+    // new sessions that reuse the previous pwd.
+    if (self.shouldExpectWorkingDirectoryUpdates) {
+        DLog(@"Shell integration/OSC 7 is providing working directory updates, polling local directory only");
+        [self addSideEffect:^(id<VT100ScreenDelegate> delegate) {
+            [delegate screenPollLocalDirectoryOnly];
+        } name:@"poll local directory only"];
         return;
     }
     DLog(@"Don't have a remote host, so changing working directory");
@@ -3192,6 +3225,12 @@ willExecuteToken:(VT100Token *)token
     } name:@"open url"];
 }
 
+- (void)terminalUpdateBlock:(NSString *)blockID action:(iTermUpdateBlockAction)action {
+    [self addPausedSideEffect:^(id<VT100ScreenDelegate> delegate, iTermTokenExecutorUnpauser *unpauser) {
+        [delegate screenUpdateBlock:blockID action:action];
+        [unpauser unpause];
+    } name:@"Update block"];
+}
 - (void)terminalBlock:(NSString *)blockID
                 start:(BOOL)start
                  type:(NSString *)type
@@ -3267,7 +3306,31 @@ willExecuteToken:(VT100Token *)token
         iTermButtonMark *mark = (iTermButtonMark *)obj;
         mark.copyBlockID = blockID;
     }];
-    [self appendStringAtCursor:@"  "];
+    [self advanceCursorAfterAddingButton];
+}
+
+- (void)terminalInsertCustomButtonWithCode:(int)code icon:(NSString *)icon {
+    iTermButtonMark *mark = (iTermButtonMark *)[self addMarkOnLine:self.numberOfScrollbackLines + self.currentGrid.cursorY
+                                                            column:self.currentGrid.cursorX
+                                                           ofClass:[iTermButtonMark class]];
+    [self.mutableIntervalTree mutateObject:mark block:^(id<IntervalTreeObject> _Nonnull obj) {
+        iTermButtonMark *mark = (iTermButtonMark *)obj;
+        [mark makeCustomWithCode:code icon:icon];
+    }];
+    [self advanceCursorAfterAddingButton];
+}
+
+- (void)terminalInvalidateCustomButtons {
+    NSArray<id<IntervalTreeImmutableObject>> *buttonMarks = [[self.intervalTree allObjects] filteredArrayUsingBlock:^BOOL(id<IntervalTreeImmutableObject> object) {
+        return [object isKindOfClass:[iTermButtonMark class]];
+    }];
+    [self.mutableIntervalTree bulkMutateObjects:buttonMarks block:^(id<IntervalTreeObject> obj) {
+        [[iTermButtonMark castFrom:obj] invalidate];
+    }];
+}
+
+- (void)advanceCursorAfterAddingButton {
+    [self appendStringAtCursor:@"    "];
 }
 
 - (void)terminalSetPointerShape:(NSString *)pointerShape {

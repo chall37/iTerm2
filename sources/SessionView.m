@@ -160,6 +160,9 @@ NSString *const SessionViewWasSelectedForInspectionNotification = @"SessionViewW
     int _colorsSettingsVisible;
 
     iTermProgressBarView *_progressBar;
+
+    // Border view for active pane indication (used for browser sessions)
+    iTermActivePaneBorderView *_activePaneBorderView;
 }
 
 + (double)titleHeight {
@@ -300,6 +303,14 @@ NSString *const SessionViewWasSelectedForInspectionNotification = @"SessionViewW
                                                   selector:@selector(colorPreferencesDidAppear:)
                                                       name:iTermColorPreferencesDidAppear
                                                     object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(windowKeyStatusDidChange:)
+                                                     name:NSWindowDidBecomeKeyNotification
+                                                   object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(windowKeyStatusDidChange:)
+                                                     name:NSWindowDidResignKeyNotification
+                                                   object:nil];
 
     }
     return self;
@@ -1004,6 +1015,12 @@ NSString *const SessionViewWasSelectedForInspectionNotification = @"SessionViewW
     [self updateDim];
 }
 
+- (void)windowKeyStatusDidChange:(NSNotification *)notification {
+    if (notification.object == self.window) {
+        [self updateActivePaneBorder];
+    }
+}
+
 - (void)sessionSelectorStatusDidChange:(NSNotification *)notification {
     [self updateSessionSelectorButton];
 }
@@ -1066,6 +1083,7 @@ NSString *const SessionViewWasSelectedForInspectionNotification = @"SessionViewW
         if (_browserViewController) {
             [self updateBrowserViewFrame];
         }
+        [self updateActivePaneBorder];
     } else {
         DLog(@"Keep everything top aligned.");
         // Don't resize anything but do keep it all top-aligned.
@@ -1104,6 +1122,7 @@ NSString *const SessionViewWasSelectedForInspectionNotification = @"SessionViewW
         _smearView.frame = frame;
         _legacyScrollerBackgroundView.frame = [self frameForLegacyScroller];
         [CATransaction commit];
+        [self updateActivePaneBorder];
     }
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
@@ -2221,6 +2240,138 @@ typedef NS_ENUM(NSInteger, SessionViewTrackingMode) {
                                      self.frame.size.height - titleHeight - reservedSpaceOnBottom);
     
     _browserViewController.view.frame = browserFrame;
+}
+
+typedef NS_OPTIONS(NSUInteger, iTermCornerFlags) {
+    iTermCornerFlagTopLeft = 1 << 0,
+    iTermCornerFlagTopRight = 1 << 1,
+    iTermCornerFlagBottomLeft = 1 << 2,
+    iTermCornerFlagBottomRight = 1 << 3
+};
+
+- (iTermCornerFlags)cornersAtWindowEdge {
+    // Tolerance for edge comparison (accounts for antialiasing, fractional points)
+    const CGFloat kEdgeTolerance = 2.0;
+
+    if (!self.window) {
+        return 0;
+    }
+
+    // Get the border view's frame (scrollview or browser view) in window coordinates
+    NSRect borderFrame = self.isBrowser ? _browserViewController.view.frame : _scrollview.frame;
+    NSRect frameInWindow = [self convertRect:borderFrame toView:nil];
+
+    // Get window content bounds
+    NSRect windowBounds = self.window.contentView.bounds;
+
+    // Check which edges of the border frame align with window content edges
+    BOOL atLeft = NSMinX(frameInWindow) <= NSMinX(windowBounds) + kEdgeTolerance;
+    BOOL atRight = NSMaxX(frameInWindow) >= NSMaxX(windowBounds) - kEdgeTolerance;
+    BOOL atBottom = NSMinY(frameInWindow) <= NSMinY(windowBounds) + kEdgeTolerance;
+
+    // For top corners, check if we're at the very top of the window frame (not just content view).
+    // If there's a title bar, our view's top will be below the window's top, so top corners
+    // should be square since they don't touch the window's rounded corners.
+    BOOL atTopOfWindow = NSMaxY(frameInWindow) >= self.window.frame.size.height - kEdgeTolerance;
+
+    iTermCornerFlags flags = 0;
+    if (atTopOfWindow && atLeft) {
+        flags |= iTermCornerFlagTopLeft; 
+    }
+    if (atTopOfWindow && atRight) {
+        flags |= iTermCornerFlagTopRight; 
+    }
+    if (atBottom && atLeft) {
+        flags |= iTermCornerFlagBottomLeft; 
+    }
+    if (atBottom && atRight) {
+        flags |= iTermCornerFlagBottomRight; 
+    }
+
+    return flags;
+}
+
+- (CGFloat)windowCornerRadiusForActiveBorder {
+    // Traditional fullscreen windows have square corners
+    if ([_delegate sessionViewIsInTraditionalFullScreen]) {
+        return 0;
+    }
+
+    NSNumber *cached = [iTermWindowCornerRadiusDetector cachedCornerRadiusFor:self.window];
+    if (cached) {
+        // The detected radius is the outside corner radius of the window.
+        // The border path is drawn inset by borderWidth/2, so we need to
+        // reduce the radius accordingly to follow the inside curve.
+        const CGFloat borderWidth = 2.0;
+        CGFloat outsideRadius = cached.doubleValue;
+        CGFloat result = MAX(0, outsideRadius - borderWidth / 2.0);
+        DLog(@"windowCornerRadiusForActiveBorder: cached=%.2f adjusted=%.2f window=%d", outsideRadius, result, (int)self.window.windowNumber);
+        return result;
+    }
+
+    DLog(@"windowCornerRadiusForActiveBorder: no cache, triggering detection for window %d", (int)self.window.windowNumber);
+    // Trigger async detection. macOS allows apps to capture their own windows
+    // without screen recording permission.
+    __weak __typeof(self) weakSelf = self;
+    [iTermWindowCornerRadiusDetector detectCornerRadiusFor:self.window
+                                                completion:^(CGFloat radius, BOOL success) {
+        DLog(@"windowCornerRadiusForActiveBorder: detection completed radius=%.2f success=%d window=%d", radius, success, (int)weakSelf.window.windowNumber);
+        if (success) {
+            [weakSelf updateActivePaneBorder];
+        }
+    }];
+    return 0; // Fallback to square corners until detection completes
+}
+
+- (void)updateActivePaneBorder {
+    const BOOL isActiveSession = [_delegate sessionViewIsActiveSession];
+    const BOOL shouldShow = ([_delegate sessionViewUseActivePaneBorder] && isActiveSession);
+
+    DLog(@"updateActivePaneBorder: isActiveSession=%d shouldShow=%d window=%d", isActiveSession, shouldShow, (int)self.window.windowNumber);
+
+    if (!shouldShow) {
+        _activePaneBorderView.hidden = YES;
+        return;
+    }
+
+    if (!_activePaneBorderView) {
+        _activePaneBorderView = [[iTermActivePaneBorderView alloc] initWithFrame:self.bounds];
+        [self addSubview:_activePaneBorderView positioned:NSWindowAbove relativeTo:nil];
+    }
+
+    NSColor *borderColor = [_delegate sessionViewActivePaneBorderColor];
+    // Use 50% alpha when window is not key
+    if (!self.window.isKeyWindow) {
+        borderColor = [borderColor colorWithAlphaComponent:borderColor.alphaComponent * 0.5];
+    }
+    _activePaneBorderView.borderColor = borderColor;
+
+    // Use the appropriate content frame based on session type
+    if (self.isBrowser) {
+        _activePaneBorderView.frame = _browserViewController.view.frame;
+    } else {
+        _activePaneBorderView.frame = _scrollview.frame;
+    }
+
+    // Get corner radius and which corners should be rounded
+    const CGFloat radius = [self windowCornerRadiusForActiveBorder];
+    const iTermCornerFlags corners = [self cornersAtWindowEdge];
+
+    DLog(@"updateActivePaneBorder: radius=%.2f corners=%lu (TL=%d TR=%d BL=%d BR=%d) window=%d",
+          radius, (unsigned long)corners,
+          (corners & iTermCornerFlagTopLeft) != 0,
+          (corners & iTermCornerFlagTopRight) != 0,
+          (corners & iTermCornerFlagBottomLeft) != 0,
+          (corners & iTermCornerFlagBottomRight) != 0,
+          (int)self.window.windowNumber);
+
+    [_activePaneBorderView setCornerRadius:radius
+                                   topLeft:(corners & iTermCornerFlagTopLeft) != 0
+                                  topRight:(corners & iTermCornerFlagTopRight) != 0
+                                bottomLeft:(corners & iTermCornerFlagBottomLeft) != 0
+                               bottomRight:(corners & iTermCornerFlagBottomRight) != 0];
+
+    _activePaneBorderView.hidden = NO;
 }
 
 - (void)updateMinimapFrameAnimated:(BOOL)animated {

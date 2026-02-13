@@ -1,134 +1,15 @@
-#import "PTYSession.h"
 #import "PTYSession+ARC.h"
 #import "PTYSession+Private.h"
+#import "PTYSession.h"
 
-#import "CapturedOutput.h"
-#import "CaptureTrigger.h"
-#import "Coprocess.h"
 #import "CVector.h"
+#import "CaptureTrigger.h"
+#import "CapturedOutput.h"
+#import "Coprocess.h"
 #import "FakeWindow.h"
 #import "FileTransferManager.h"
 #import "FutureMethods.h"
 #import "ITAddressBookMgr.h"
-#import "iTerm2SharedARC-Swift.h"
-#import "iTerm.h"
-#import "iTermAPIHelper.h"
-#import "iTermActionsModel.h"
-#import "iTermAddTriggerViewController.h"
-#import "iTermAdvancedSettingsModel.h"
-#import "iTermAnnouncementViewController.h"
-#import "iTermApplication.h"
-#import "iTermApplicationDelegate.h"
-#import "iTermAutomaticProfileSwitcher.h"
-#import "iTermBackgroundCommandRunner.h"
-#import "iTermBackgroundDrawingHelper.h"
-#import "iTermBadgeLabel.h"
-#import "iTermBuriedSessions.h"
-#import "iTermBuiltInFunctions.h"
-#import "iTermCacheableImage.h"
-#import "iTermCapturedOutputMark.h"
-#import "iTermCarbonHotKeyController.h"
-#import "iTermCharacterSource.h"
-#import "iTermColorMap.h"
-#import "iTermColorPresets.h"
-#import "iTermColorSuggester.h"
-#import "iTermCommandRunnerPool.h"
-#import "iTermComposerManager.h"
-#import "iTermCommandHistoryCommandUseMO+Additions.h"
-#import "iTermController.h"
-#import "iTermCopyModeHandler.h"
-#import "iTermCopyModeState.h"
-#import "iTermDisclosableView.h"
-#import "iTermEchoProbe.h"
-#import "iTermExpect.h"
-#import "iTermExpressionEvaluator.h"
-#import "iTermExpressionParser.h"
-#import "iTermFindDriver.h"
-#import "iTermFindOnPageHelper.h"
-#import "iTermFindPasteboard.h"
-#import "iTermGCD.h"
-#import "iTermGraphicSource.h"
-#import "iTermIntervalTreeObserver.h"
-#import "iTermKeyMappings.h"
-#import "iTermKeystroke.h"
-#import "iTermModifyOtherKeysMapper1.h"
-#import "iTermModifyOtherKeysMapper.h"
-#import "iTermNaggingController.h"
-#import "iTermNotificationController.h"
-#import "iTermHapticActuator.h"
-#import "iTermHistogram.h"
-#import "iTermHotKeyController.h"
-#import "iTermInitialDirectory.h"
-#import "iTermKeyLabels.h"
-#import "iTermLoggingHelper.h"
-#import "iTermMalloc.h"
-#import "iTermMetalClipView.h"
-#import "iTermMigrationHelper.h"
-#import "iTermMultiServerJobManager.h"
-#import "iTermObject.h"
-#import "iTermOpenDirectory.h"
-#import "iTermPreferences.h"
-#import "iTermRateLimitedUpdate.h"
-#import "iTermScriptConsole.h"
-#import "iTermScriptHistory.h"
-#import "iTermSharedImageStore.h"
-#import "iTermSnippetsModel.h"
-#import "iTermStandardKeyMapper.h"
-#import "iTermStatusBarUnreadCountController.h"
-#import "iTermSoundPlayer.h"
-#import "iTermRawKeyMapper.h"
-#import "iTermTermkeyKeyMapper.h"
-#import "iTermMetaFrustrationDetector.h"
-#import "iTermMetalGlue.h"
-#import "iTermMetalDriver.h"
-#import "iTermMouseCursor.h"
-#import "iTermNotificationCenter.h"
-#import "iTermPasteHelper.h"
-#import "iTermPreferences.h"
-#import "iTermPrintGuard.h"
-#import "iTermProcessCache.h"
-#import "iTermProfilePreferences.h"
-#import "iTermPromptOnCloseReason.h"
-#import "iTermRecentDirectoryMO.h"
-#import "iTermRestorableSession.h"
-#import "iTermRule.h"
-#import "iTermSavePanel.h"
-#import "iTermScriptFunctionCall.h"
-#import "iTermSecureKeyboardEntryController.h"
-#import "iTermSelection.h"
-#import "iTermSemanticHistoryController.h"
-#import "iTermSessionFactory.h"
-#import "iTermSessionHotkeyController.h"
-#import "iTermSessionLauncher.h"
-#import "iTermSessionNameController.h"
-#import "iTermSessionTitleBuiltInFunction.h"
-#import "iTermSetFindStringNotification.h"
-#import "iTermShellHistoryController.h"
-#import "iTermShortcut.h"
-#import "iTermShortcutInputView.h"
-#import "iTermSlowOperationGateway.h"
-#import "iTermStatusBarLayout.h"
-#import "iTermStatusBarLayout+tmux.h"
-#import "iTermStatusBarViewController.h"
-#import "iTermSwiftyString.h"
-#import "iTermSwiftyStringGraph.h"
-#import "iTermSwipeTracker.h"
-#import "iTermSystemVersion.h"
-#import "iTermTextExtractor.h"
-#import "iTermTheme.h"
-#import "iTermThroughputEstimator.h"
-#import "iTermTmuxStatusBarMonitor.h"
-#import "iTermTmuxOptionMonitor.h"
-#import "iTermUpdateCadenceController.h"
-#import "iTermURLStore.h"
-#import "iTermUserDefaultsObserver.h"
-#import "iTermVariableReference.h"
-#import "iTermVariableScope.h"
-#import "iTermVariableScope+Global.h"
-#import "iTermVariableScope+Session.h"
-#import "iTermWarning.h"
-#import "iTermWebSocketCookieJar.h"
-#import "iTermWorkingDirectoryPoller.h"
 #import "MovePaneController.h"
 #import "MovingAverage.h"
 #import "NSAlert+iTerm.h"
@@ -152,24 +33,24 @@
 #import "NSThread+iTerm.h"
 #import "NSURL+iTerm.h"
 #import "NSUserDefaults+iTerm.h"
-#import "NSView+iTerm.h"
 #import "NSView+RecursiveDescription.h"
+#import "NSView+iTerm.h"
 #import "NSWindow+PSM.h"
 #import "NSWorkspace+iTerm.h"
+#import "PSMMinimalTabStyle.h"
+#import "PTYNoteViewController.h"
+#import "PTYTask+ProcessInfo.h"
+#import "PTYTask.h"
+#import "PTYTextView+ARC.h"
+#import "PTYTextView+MouseHandler.h"
+#import "PTYTextView.h"
+#import "PTYWindow.h"
 #import "PasteContext.h"
 #import "PasteEvent.h"
 #import "PreferencePanel.h"
 #import "ProfilePreferencesViewController.h"
 #import "ProfilesColorsPreferencesViewController.h"
 #import "ProfilesGeneralPreferencesViewController.h"
-#import "PSMMinimalTabStyle.h"
-#import "PTYNoteViewController.h"
-#import "PTYTask.h"
-#import "PTYTask+ProcessInfo.h"
-#import "PTYTextView.h"
-#import "PTYTextView+MouseHandler.h"
-#import "PTYTextView+ARC.h"
-#import "PTYWindow.h"
 #import "RegexKitLite.h"
 #import "SCPFile.h"
 #import "SCPPath.h"
@@ -177,7 +58,6 @@
 #import "SessionView.h"
 #import "TaskNotifier.h"
 #import "TerminalFile.h"
-#import "TriggerController.h"
 #import "TmuxController.h"
 #import "TmuxControllerRegistry.h"
 #import "TmuxGateway.h"
@@ -185,18 +65,139 @@
 #import "TmuxStateParser.h"
 #import "TmuxWindowOpener.h"
 #import "Trigger.h"
+#import "TriggerController.h"
 #import "VT100DCSParser.h"
 #import "VT100RemoteHost.h"
-#import "VT100Screen.h"
 #import "VT100Screen+Search.h"
+#import "VT100Screen.h"
 #import "VT100ScreenConfiguration.h"
 #import "VT100ScreenMark.h"
-#import "VT100ScreenMutableState.h"
 #import "VT100ScreenMutableState+Resizing.h"
+#import "VT100ScreenMutableState.h"
 #import "VT100Terminal.h"
 #import "VT100Token.h"
 #import "WindowArrangements.h"
 #import "WindowControllerInterface.h"
+#import "iTerm.h"
+#import "iTerm2SharedARC-Swift.h"
+#import "iTermAPIHelper.h"
+#import "iTermActionsModel.h"
+#import "iTermAddTriggerViewController.h"
+#import "iTermAdvancedSettingsModel.h"
+#import "iTermAnnouncementViewController.h"
+#import "iTermApplication.h"
+#import "iTermApplicationDelegate.h"
+#import "iTermAutomaticProfileSwitcher.h"
+#import "iTermBackgroundCommandRunner.h"
+#import "iTermBackgroundDrawingHelper.h"
+#import "iTermBadgeLabel.h"
+#import "iTermBuiltInFunctions.h"
+#import "iTermBuriedSessions.h"
+#import "iTermCacheableImage.h"
+#import "iTermCapturedOutputMark.h"
+#import "iTermCarbonHotKeyController.h"
+#import "iTermCharacterSource.h"
+#import "iTermColorMap.h"
+#import "iTermColorPresets.h"
+#import "iTermColorSuggester.h"
+#import "iTermCommandHistoryCommandUseMO+Additions.h"
+#import "iTermCommandRunnerPool.h"
+#import "iTermComposerManager.h"
+#import "iTermController.h"
+#import "iTermCopyModeHandler.h"
+#import "iTermCopyModeState.h"
+#import "iTermDisclosableView.h"
+#import "iTermEchoProbe.h"
+#import "iTermExpect.h"
+#import "iTermExpressionEvaluator.h"
+#import "iTermExpressionParser.h"
+#import "iTermFindDriver.h"
+#import "iTermFindOnPageHelper.h"
+#import "iTermFindPasteboard.h"
+#import "iTermGCD.h"
+#import "iTermGraphicSource.h"
+#import "iTermHapticActuator.h"
+#import "iTermHistogram.h"
+#import "iTermHotKeyController.h"
+#import "iTermInitialDirectory.h"
+#import "iTermIntervalTreeObserver.h"
+#import "iTermKeyLabels.h"
+#import "iTermKeyMappings.h"
+#import "iTermKeystroke.h"
+#import "iTermLoggingHelper.h"
+#import "iTermMalloc.h"
+#import "iTermMetaFrustrationDetector.h"
+#import "iTermMetalClipView.h"
+#import "iTermMetalDriver.h"
+#import "iTermMetalGlue.h"
+#import "iTermMigrationHelper.h"
+#import "iTermModifyOtherKeysMapper.h"
+#import "iTermModifyOtherKeysMapper1.h"
+#import "iTermMouseCursor.h"
+#import "iTermMultiServerJobManager.h"
+#import "iTermNaggingController.h"
+#import "iTermNotificationCenter.h"
+#import "iTermNotificationController.h"
+#import "iTermObject.h"
+#import "iTermOpenDirectory.h"
+#import "iTermPasteHelper.h"
+#import "iTermPreferences.h"
+#import "iTermPreferences.h"
+#import "iTermPrintGuard.h"
+#import "iTermProcessCache.h"
+#import "iTermProfilePreferences.h"
+#import "iTermPromptOnCloseReason.h"
+#import "iTermRateLimitedUpdate.h"
+#import "iTermRawKeyMapper.h"
+#import "iTermRecentDirectoryMO.h"
+#import "iTermRestorableSession.h"
+#import "iTermRule.h"
+#import "iTermSavePanel.h"
+#import "iTermScriptConsole.h"
+#import "iTermScriptFunctionCall.h"
+#import "iTermScriptHistory.h"
+#import "iTermSecureKeyboardEntryController.h"
+#import "iTermSelection.h"
+#import "iTermSemanticHistoryController.h"
+#import "iTermSessionFactory.h"
+#import "iTermSessionHotkeyController.h"
+#import "iTermSessionLauncher.h"
+#import "iTermSessionNameController.h"
+#import "iTermSessionTitleBuiltInFunction.h"
+#import "iTermSetFindStringNotification.h"
+#import "iTermSharedImageStore.h"
+#import "iTermShellHistoryController.h"
+#import "iTermShortcut.h"
+#import "iTermShortcutInputView.h"
+#import "iTermSlowOperationGateway.h"
+#import "iTermSnippetsModel.h"
+#import "iTermSoundPlayer.h"
+#import "iTermStandardKeyMapper.h"
+#import "iTermStatusBarLayout+tmux.h"
+#import "iTermStatusBarLayout.h"
+#import "iTermStatusBarUnreadCountController.h"
+#import "iTermStatusBarViewController.h"
+#import "iTermSwiftyString.h"
+#import "iTermSwiftyStringGraph.h"
+#import "iTermSwipeTracker.h"
+#import "iTermSystemVersion.h"
+#import "iTermTermkeyKeyMapper.h"
+#import "iTermTextExtractor.h"
+#import "iTermTheme.h"
+#import "iTermThroughputEstimator.h"
+#import "iTermTmuxOptionMonitor.h"
+#import "iTermTmuxStatusBarMonitor.h"
+#import "iTermURLStore.h"
+#import "iTermUpdateCadenceController.h"
+#import "iTermUserDefaults.h"
+#import "iTermUserDefaultsObserver.h"
+#import "iTermVariableReference.h"
+#import "iTermVariableScope+Global.h"
+#import "iTermVariableScope+Session.h"
+#import "iTermVariableScope.h"
+#import "iTermWarning.h"
+#import "iTermWebSocketCookieJar.h"
+#import "iTermWorkingDirectoryPoller.h"
 #import <apr-1/apr_base64.h>
 #include <stdlib.h>
 #include <sys/time.h>
@@ -221,7 +222,7 @@ NSString *const PTYCommandDidExitUserInfoKeyCommand = @"Command";
 NSString *const PTYCommandDidExitUserInfoKeyExitCode = @"Code";
 NSString *const PTYCommandDidExitUserInfoKeyRemoteHost = @"Host";
 NSString *const PTYCommandDidExitUserInfoKeyDirectory = @"Directory";
-NSString *const PTYCommandDidExitUserInfoKeySnapshot = @"Snapshot";
+NSString *const PTYCommandDidExitUserInfoKeyDataSource = @"Data Source";
 NSString *const PTYCommandDidExitUserInfoKeyStartLine = @"Line";
 NSString *const PTYCommandDidExitUserInfoKeyLineCount = @"Count";
 NSString *const PTYCommandDidExitUserInfoKeyURL = @"URL";
@@ -408,6 +409,13 @@ typedef NS_ENUM(NSUInteger, PTYSessionTurdType) {
     // that have been customized. Changes in the original profile will be copied over
     // to profile except for these keys.
     NSMutableSet *_overriddenFields;
+
+    // Stores the profile color values that existed before any escape sequence modified them.
+    // Key is the profile key (e.g., "Foreground Color" or "Foreground Color (Dark)").
+    // Value is the color dictionary value from the profile.
+    // When an escape sequence resets a color, we restore from here instead of _originalProfile.
+    // This ensures Edit Session color changes are preserved through escape sequence set/reset cycles.
+    NSMutableDictionary *_preEscapeSequenceColors;
 
     // A digital video recorder for this session that implements the instant replay feature. These
     // are non-null while showing instant replay.
@@ -638,7 +646,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTurdType) {
     BOOL _connectingSSH;
     NSMutableData *_queuedConnectingSSH;
 
-    __weak id<VT100ScreenMarkReading> _selectedCommandMark;
+    __weak id<VT100ScreenMarkReading> _selectedScreenMark;
     NSMutableArray<PTYSessionHostState *> *_hostStack;
     NSDictionary *_originatingArrangement;
     NSString *_originatingArrangementName;
@@ -922,7 +930,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTurdType) {
                                                                selector:@selector(activeSpaceDidChange:)
                                                                    name:NSWorkspaceActiveSpaceDidChangeNotification
                                                                  object:nil];
-        [[NSUserDefaults standardUserDefaults] it_addObserverForKey:kPreferenceKeyTabStyle
+        [[iTermUserDefaults userDefaults] it_addObserverForKey:kPreferenceKeyTabStyle
                                                               block:^(id _Nonnull newValue) {
             [weakSelf themeDidChange];
         }];
@@ -981,6 +989,7 @@ ITERM_WEAKLY_REFERENCEABLE
     [_colorFgBgVariable release];
     [_profile release];
     [_overriddenFields release];
+    [_preEscapeSequenceColors release];
     _pasteHelper.delegate = nil;
     [_pasteHelper release];
     [_backgroundImage release];
@@ -3591,7 +3600,7 @@ webViewConfiguration:(WKWebViewConfiguration *)webViewConfiguration
             [_sshWriteQueue appendData:data];
             return;
         }
-        if ((_buffering || _screen.sendingIsBlocked) && !reporting) {
+        if ((_buffering || _screen.sendingIsBlocked || _bracketedPastePending > 0) && !reporting) {
             DLog(@"Defer write of %@", [data stringWithEncoding:NSUTF8StringEncoding]);
             if (!_dataQueue) {
                 _dataQueue = [[NSMutableArray alloc] init];
@@ -4920,6 +4929,11 @@ webViewConfiguration:(WKWebViewConfiguration *)webViewConfiguration
                                                                   inProfile:aDict];
     }
 
+    self.useActivePaneBorder = [iTermProfilePreferences boolForKey:iTermAmendedColorKey(KEY_USE_ACTIVE_PANE_BORDER, aDict, dark)
+                                                         inProfile:aDict];
+    self.activePaneBorderColor = [[iTermProfilePreferences objectForKey:iTermAmendedColorKey(KEY_ACTIVE_PANE_BORDER_COLOR, aDict, dark)
+                                                              inProfile:aDict] colorValueForKey:iTermAmendedColorKey(KEY_ACTIVE_PANE_BORDER_COLOR, aDict, dark)];
+
     [self setSmartCursorColor:[iTermProfilePreferences boolForKey:iTermAmendedColorKey(KEY_SMART_CURSOR_COLOR, aDict, dark)
                                                         inProfile:aDict]];
 
@@ -4956,6 +4970,7 @@ webViewConfiguration:(WKWebViewConfiguration *)webViewConfiguration
                               @(kColorMapMatch): k(KEY_MATCH_COLOR),
                               @(kColorMapCursor): k(KEY_CURSOR_COLOR),
                               @(kColorMapCursorText): k(KEY_CURSOR_TEXT_COLOR),
+                              @(kColorMapIMECursor): k(KEY_IME_CURSOR_COLOR),
                               @(kColorMapUnderline): (useUnderline ? k(KEY_UNDERLINE_COLOR) : [NSNull null])
     };
     return keyMap;
@@ -7090,6 +7105,15 @@ static NSString *const PTYSessionComposerPrefixUserDataKeyDetectedByTrigger = @"
         // commonly when setting tab color after a split.
         return;
     }
+
+    // Clear pre-escape-sequence baselines for modified keys.
+    // When Edit Session changes a color, it becomes the new baseline for reset operations.
+    // Note: screenSetColor:profileKey: will restore the baseline after calling this method
+    // for escape-sequence-initiated changes.
+    for (NSString *key in newValues) {
+        [_preEscapeSequenceColors removeObjectForKey:key];
+    }
+
     DLog(@"Set bookmark and reload profile");
     [[ProfileModel sessionsInstance] setBookmark:temp withGuid:temp[KEY_GUID]];
 
@@ -7578,7 +7602,7 @@ scrollToFirstResult:(BOOL)scrollToFirstResult
         [weakSelf setFilterProgress:progress];
     }];
     if (sourceSession.textview.findOnPageHelper.absLineRange.length == 0 ||
-        (_selectedCommandMark == [_screen lastPromptMark] && sourceSession.selectedCommandMark.isRunning)) {
+        (_selectedScreenMark == [_screen lastPromptMark] && sourceSession.selectedCommandMark.isRunning)) {
         [self.liveSession addContentSubscriber:_asyncFilter];
     }
     if (replacingFilter) {
@@ -7594,7 +7618,10 @@ scrollToFirstResult:(BOOL)scrollToFirstResult
 }
 
 - (id<VT100ScreenMarkReading>)selectedCommandMark {
-    return _selectedCommandMark;
+    if (!_selectedScreenMark.isPrompt) {
+        return nil;
+    }
+    return _selectedScreenMark;
 }
 
 - (void)setFilterProgress:(double)progress {
@@ -9000,7 +9027,8 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
             if (mark.command != nil) {
                 [self selectCommandWithMarkIfSafe:mark];
             } else {
-                [self selectCommandWithMark:nil];
+                // Remove the selected command (and its abs line range)
+                [self selectScreenMark:mark];
             }
         }
         [_textview highlightMarkOnLine:VT100GridRangeMax([_screen lineNumberRangeOfInterval:obj.entry.interval])
@@ -9039,8 +9067,8 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
 
 - (void)previousMarkOrNote:(BOOL)annotationsOnly {
     NSArray *objects = nil;
-    if (_selectedCommandMark && !annotationsOnly) {
-        [self selectPreviousCommandMark];
+    if (_selectedScreenMark && !annotationsOnly) {
+        [self selectPreviousScreenMark];
         return;
     }
     if (self.currentMarkOrNotePosition == nil) {
@@ -9077,25 +9105,25 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
             [mark isKindOfClass:[PTYAnnotation class]]);
 }
 
-- (void)selectPreviousCommandMark {
-    id<VT100ScreenMarkReading> mark = [_screen promptMarkBeforePromptMark:_selectedCommandMark] ?: [_screen lastPromptMark];
+- (void)selectPreviousScreenMark {
+    id<VT100ScreenMarkReading> mark = [_screen screenMarkBeforeScreenMark:_selectedScreenMark] ?: [_screen lastScreenMark];
     if (mark) {
-        [self selectCommandWithMark:mark];
+        [self selectScreenMark:mark];
         [self setCurrentMarkOrNote:mark];
     }
 }
 
-- (void)selectNextCommandMark {
-    id<VT100ScreenMarkReading> mark = [_screen promptMarkAfterPromptMark:_selectedCommandMark] ?: [_screen firstPromptMark];
+- (void)selectNextScreenMark {
+    id<VT100ScreenMarkReading> mark = [_screen screenMarkAfterScreenMark:_selectedScreenMark] ?: [_screen firstScreenMark];
     if (mark) {
-        [self selectCommandWithMark:mark];
+        [self selectScreenMark:mark];
         [self setCurrentMarkOrNote:mark];
     }
 }
 
 - (void)nextMarkOrNote:(BOOL)annotationsOnly {
-    if (_selectedCommandMark && !annotationsOnly) {
-        [self selectNextCommandMark];
+    if (_selectedScreenMark && !annotationsOnly) {
+        [self selectNextScreenMark];
         return;
     }
     NSArray<id<IntervalTreeImmutableObject>> *objects = nil;
@@ -9229,10 +9257,10 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
         [self hideSession];
 
         static NSString *const kAutoBurialKey = @"NoSyncAutoBurialReveal";
-        if (![[NSUserDefaults standardUserDefaults] boolForKey:kAutoBurialKey]) {
+        if (![[iTermUserDefaults userDefaults] boolForKey:kAutoBurialKey]) {
             [[iTermNotificationController sharedInstance] notify:@"Session Buried"
                                                  withDescription:@"It can be restored by detaching from tmux, or from the Sessions > Buried Sessions menu."];
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:kAutoBurialKey];
+            [[iTermUserDefaults userDefaults] setBool:YES forKey:kAutoBurialKey];
         }
     }
 }
@@ -9323,14 +9351,15 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
 
 - (void)tmuxGatewayDidTimeOutDuringInitialization:(BOOL)duringInitialization {
     if (duringInitialization) {
-        const iTermWarningSelection selection =
-        [iTermWarning showWarningWithTitle:@"It’s taking a long time for tmux to respond. If this is a old or funky system it might expect newline rather than carriage return to end commands. You can adjust the line terminator used by tmux integration in Settings."
-                                   actions:@[ @"OK", @"Reveal Setting" ]
-                                 accessory:nil
-                                identifier:@"NoSyncTmuxHung"
-                               silenceable:kiTermWarningTypePermanentlySilenceable
-                                   heading:@"Slow tmux Response"
-                                    window:nil];
+        // "Reveal Setting" is a one-time navigation action and shouldn't be remembered.
+        iTermWarning *warning = [[iTermWarning alloc] init];
+        warning.title = @"It's taking a long time for tmux to respond. If this is a old or funky system it might expect newline rather than carriage return to end commands. You can adjust the line terminator used by tmux integration in Settings.";
+        warning.actionLabels = @[ @"OK", @"Reveal Setting" ];
+        warning.identifier = @"NoSyncTmuxHung";
+        warning.warningType = kiTermWarningTypePermanentlySilenceable;
+        warning.heading = @"Slow tmux Response";
+        warning.doNotRememberLabels = @[ @"Reveal Setting" ];
+        const iTermWarningSelection selection = [warning runModal];
         if (selection == 1) {
             [self revealProfileSettingWithKey:KEY_TMUX_NEWLINE];
         }
@@ -9503,6 +9532,16 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
 - (void)tmuxWindowPaneDidPause:(int)wp notification:(BOOL)notification {
     PTYSession *session = [_tmuxController sessionForWindowPane:wp];
     [session setTmuxPaused:YES allowAutomaticUnpause:notification];
+}
+
+- (void)tmuxClientSessionChanged:(NSString *)clientName {
+    DLog(@"Client session changed for %@", clientName);
+    [_tmuxController clientSessionChanged:clientName];
+}
+
+- (void)tmuxClientDetached:(NSString *)clientName {
+    DLog(@"Client detached: %@", clientName);
+    [_tmuxController clientDetached:clientName];
 }
 
 - (void)setTmuxPaused:(BOOL)paused allowAutomaticUnpause:(BOOL)allowAutomaticUnpause {
@@ -10739,7 +10778,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
 }
 
 - (void)showError:(NSString *)message suppressionKey:(NSString *)key identifier:(NSString *)identifier {
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:key]) {
+    if ([[iTermUserDefaults userDefaults] boolForKey:key]) {
         return;
     }
     void (^completion)(int) = ^(int selection) { };
@@ -11013,24 +11052,13 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
     VT100GridCoord coord = VT100GridCoordMake(self.screen.cursorX - 1,
                                               self.screen.numberOfScrollbackLines + self.screen.cursorY - 1);
     iTermTextExtractor *extractor = [iTermTextExtractor textExtractorWithDataSource:self.screen];
-    VT100GridCoord lastCoord = coord;
     coord = [extractor predecessorOfCoord:coord];
-    NSMutableString *suffix = [@"" mutableCopy];
-    NSString *replacement = nil;
-    NSString *word = nil;
-    while ([manager hasReplacementsWithSuffix:suffix] &&
-           !VT100GridCoordEquals(coord, lastCoord)) {
-        word = [suffix copy];
-        replacement = [manager applyReplacementsTo:suffix];
-        NSString *c = [extractor stringForCharacterAt:coord];
-        if (!c) {
-            return NO;
-        }
-        [suffix insertString:c atIndex:0];
-        lastCoord = coord;
-        coord = [extractor predecessorOfCoord:coord];
+    NSString *word = [[extractor fastWordAt:coord] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    if (!word) {
+        return NO;
     }
-    if (!replacement || !word) {
+    NSString *replacement = [manager applyReplacementsTo:word];
+    if (!replacement) {
         return NO;
     }
     if (![manager shouldReplaceShortcut:word]) {
@@ -13825,7 +13853,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
 
 - (void)askToEnableTerminalInitiatedResizing:(void (^)(void))allowOnce {
     NSString *key = @"NoSyncSuppressPromptToEnableResizing";
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:key]) {
+    if ([[iTermUserDefaults userDefaults] boolForKey:key]) {
         return;
     }
     NSString *identifier = @"Resize Window Announcement";
@@ -13840,7 +13868,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
                 break;
 
             case 2:
-                [[NSUserDefaults standardUserDefaults] setBool:YES forKey:key];
+                [[iTermUserDefaults userDefaults] setBool:YES forKey:key];
                 break;
 
             default:
@@ -13863,7 +13891,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
 
 - (void)askToEnableTerminalInitiatedResizingWhenUnfocused:(void (^)(void))allowOnce {
     NSString *key = @"NoSyncSuppressPromptToEnableUnfocusedResizing";
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:key]) {
+    if ([[iTermUserDefaults userDefaults] boolForKey:key]) {
         return;
     }
     NSString *identifier = @"Resize Unfocused Window Announcement";
@@ -13878,7 +13906,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
                 break;
 
             case 2:
-                [[NSUserDefaults standardUserDefaults] setBool:YES forKey:key];
+                [[iTermUserDefaults userDefaults] setBool:YES forKey:key];
                 break;
 
             default:
@@ -14126,12 +14154,36 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
     [self sendDataQueue];
 }
 
+- (void)screenSendTmuxOSC4Report:(NSData *)report {
+    if (!_tmuxController.shouldHandleOSC4Queries) {
+        DLog(@"Not handling osc 4 queries");
+        return;  // tmux < 3.6, tmux handles it
+    }
+    if (!_tmuxController.isResponsibleForOSCQueries) {
+        DLog(@"Not responsible for OSC queries");
+        return;  // Another client will respond
+    }
+    DLog(@"Sending OSC 4 report");
+    [self writeLatin1EncodedData:report broadcastAllowed:NO reporting:YES];
+}
+
 - (void)sendDataQueue {
+    DLog(@"called");
     for (NSData *data in _dataQueue) {
         DLog(@"Send deferred write of %@", [data stringWithEncoding:NSUTF8StringEncoding]);
         [self writeData:data];
     }
     [_dataQueue removeAllObjects];
+}
+
+// Called when the expectation for the first chunk of a bracketed paste is ready.
+// The first chunk was already queued synchronously; now we can flush if conditions allow.
+- (void)bracketedPasteDidExpect {
+    _bracketedPastePending -= 1;
+    DLog(@"new count=%@", @(_bracketedPastePending));
+    if (_bracketedPastePending == 0 && !_buffering && !_screen.sendingIsBlocked) {
+        [self sendDataQueue];
+    }
 }
 
 - (NSRect)screenWindowFrame {
@@ -14905,7 +14957,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
 
 - (void)screenDidTryToUseDECRQCRA {
     NSString *const userDefaultsKey = @"NoSyncDisableDECRQCRA";
-    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    NSUserDefaults *ud = [iTermUserDefaults userDefaults];
     NSNumber *obj = [NSNumber castFrom:[ud objectForKey:userDefaultsKey]];
     if (obj) {
         return;
@@ -15028,10 +15080,128 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
 // 8-15 are ansi bright colors,
 // 16-255 are 256 color-mode colors.
 // If empty, reset all.
+// Returns the base color key by stripping any light/dark mode suffix.
+- (NSString *)baseColorKeyForProfileKey:(NSString *)profileKey {
+    if ([profileKey hasSuffix:COLORS_LIGHT_MODE_SUFFIX]) {
+        return [profileKey substringToIndex:profileKey.length - [COLORS_LIGHT_MODE_SUFFIX length]];
+    }
+    if ([profileKey hasSuffix:COLORS_DARK_MODE_SUFFIX]) {
+        return [profileKey substringToIndex:profileKey.length - [COLORS_DARK_MODE_SUFFIX length]];
+    }
+    return profileKey;
+}
+
+// Returns YES if the given key is a color key (not KEY_USE_SEPARATE_COLORS_FOR_LIGHT_AND_DARK_MODE).
+- (BOOL)isColorBaselineKey:(NSString *)key {
+    return ![key isEqualToString:KEY_USE_SEPARATE_COLORS_FOR_LIGHT_AND_DARK_MODE];
+}
+
+// Returns YES if there are any color baselines remaining (excluding the mode setting).
+- (BOOL)hasRemainingColorBaselines {
+    for (NSString *key in _preEscapeSequenceColors) {
+        if ([self isColorBaselineKey:key]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
 - (NSDictionary<NSNumber *, id> *)screenResetColorWithColorMapKey:(int)key
                                                        profileKey:(NSString *)profileKey
                                                              dark:(BOOL)dark {
-    DLog(@"key=%d profileKey=%@ dark=%d", key, profileKey, dark);
+    DLog(@"screenResetColor: key=%d profileKey=%@ dark=%d", key, profileKey, dark);
+    DLog(@"screenResetColor: _preEscapeSequenceColors=%@", _preEscapeSequenceColors);
+
+    // Check for saved pre-escape-sequence color (Edit Session baseline)
+    if (profileKey) {
+        // Check if the mode setting has changed since baselines were saved.
+        NSNumber *baselineModeSetting = _preEscapeSequenceColors[KEY_USE_SEPARATE_COLORS_FOR_LIGHT_AND_DARK_MODE];
+        const BOOL currentlyUsesModes = [iTermProfilePreferences boolForKey:KEY_USE_SEPARATE_COLORS_FOR_LIGHT_AND_DARK_MODE
+                                                                  inProfile:_profile];
+        const BOOL baselineUsedModes = [baselineModeSetting boolValue];
+        const BOOL modeSettingChanged = baselineModeSetting && (baselineUsedModes != currentlyUsesModes);
+        DLog(@"screenResetColor: baselineModeSetting=%@ currentlyUsesModes=%d baselineUsedModes=%d modeSettingChanged=%d",
+              baselineModeSetting, currentlyUsesModes, baselineUsedModes, modeSettingChanged);
+
+        id savedColorValue = nil;
+        NSString *baselineKey = nil;
+        NSMutableDictionary *valuesToRestore = [NSMutableDictionary dictionary];
+
+        if (modeSettingChanged) {
+            NSString *baseKey = [self baseColorKeyForProfileKey:profileKey];
+
+            if (currentlyUsesModes && !baselineUsedModes) {
+                // Session NOW uses separate colors but originally did NOT.
+                // The baseline was saved with an unsuffixed key.
+                // Look up the unsuffixed key and restore to it.
+                baselineKey = baseKey;
+                savedColorValue = _preEscapeSequenceColors[baselineKey];
+                if (savedColorValue) {
+                    // Restore to the unsuffixed key
+                    valuesToRestore[baselineKey] = savedColorValue;
+                }
+            } else if (!currentlyUsesModes && baselineUsedModes) {
+                // Session originally used separate colors but NOW does NOT.
+                // The baselines were saved with suffixed keys.
+                // Look up both suffixed keys and restore all of them plus the unsuffixed key.
+                NSString *lightKey = [baseKey stringByAppendingString:COLORS_LIGHT_MODE_SUFFIX];
+                NSString *darkKey = [baseKey stringByAppendingString:COLORS_DARK_MODE_SUFFIX];
+
+                id lightValue = _preEscapeSequenceColors[lightKey];
+                id darkValue = _preEscapeSequenceColors[darkKey];
+
+                if (lightValue) {
+                    valuesToRestore[lightKey] = lightValue;
+                    valuesToRestore[baseKey] = lightValue;  // Also restore unsuffixed
+                    baselineKey = lightKey;
+                    savedColorValue = lightValue;
+                }
+                if (darkValue) {
+                    valuesToRestore[darkKey] = darkValue;
+                    if (!lightValue) {
+                        valuesToRestore[baseKey] = darkValue;  // Also restore unsuffixed if no light
+                        baselineKey = darkKey;
+                        savedColorValue = darkValue;
+                    }
+                }
+            }
+        } else {
+            // Mode setting hasn't changed, use the key as-is.
+            baselineKey = profileKey;
+            savedColorValue = _preEscapeSequenceColors[profileKey];
+            if (savedColorValue) {
+                valuesToRestore[profileKey] = savedColorValue;
+            }
+        }
+
+        if (savedColorValue) {
+            DLog(@"screenResetColor: Restoring from pre-escape-sequence baseline: %@", valuesToRestore);
+
+            // Remove the baseline key(s) we're consuming
+            for (NSString *keyToRemove in valuesToRestore) {
+                [_preEscapeSequenceColors removeObjectForKey:keyToRemove];
+            }
+
+            [self setSessionSpecificProfileValues:valuesToRestore];
+
+            DLog(@"screenResetColor: after restore, profile foreground keys: Light=%@ Dark=%@ Unsuffixed=%@",
+                  _profile[@"Foreground Color (Light)"],
+                  _profile[@"Foreground Color (Dark)"],
+                  _profile[@"Foreground Color"]);
+
+            // If this was the last color baseline, also restore the mode setting.
+            if (baselineModeSetting && ![self hasRemainingColorBaselines]) {
+                DLog(@"Last color baseline consumed, restoring mode setting to %@", baselineModeSetting);
+                [_preEscapeSequenceColors removeObjectForKey:KEY_USE_SEPARATE_COLORS_FOR_LIGHT_AND_DARK_MODE];
+                [self setSessionSpecificProfileValues:@{ KEY_USE_SEPARATE_COLORS_FOR_LIGHT_AND_DARK_MODE: baselineModeSetting }];
+            }
+
+            return @{};
+        }
+    }
+
+    DLog(@"screenResetColor: no baseline found, falling back to original profile");
+    // Fall back to original profile
     return [self resetColorWithKey:key
                        fromProfile:_originalProfile
                         profileKey:profileKey
@@ -15044,18 +15214,94 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
     }
 
     if (profileKey) {
+        // Save current value BEFORE modifying, if not already saved.
+        // This preserves the Edit Session baseline for later reset operations.
+        // Retain the baseline since setSessionSpecificProfileValues will remove it from
+        // _preEscapeSequenceColors, potentially deallocating it.
+        id baselineToPreserve = [[_preEscapeSequenceColors[profileKey] retain] autorelease];
+        DLog(@"screenSetColor: profileKey=%@ existingBaseline=%@", profileKey, baselineToPreserve);
+        if (!baselineToPreserve) {
+            id currentValue = _profile[profileKey];
+            DLog(@"screenSetColor: no existing baseline, currentValue from profile=%@", currentValue);
+            if (currentValue) {
+                if (!_preEscapeSequenceColors) {
+                    _preEscapeSequenceColors = [[NSMutableDictionary alloc] init];
+                }
+                baselineToPreserve = currentValue;
+            }
+        }
+
         [self setSessionSpecificProfileValues:@{ profileKey: [color dictionaryValue] }];
+
+        // Restore the baseline after setSessionSpecificProfileValues clears it.
+        // For escape-sequence-initiated changes, we want to preserve the baseline
+        // so that reset operations restore to the Edit Session value.
+        if (baselineToPreserve) {
+            _preEscapeSequenceColors[profileKey] = baselineToPreserve;
+        }
+        DLog(@"screenSetColor: after set, _preEscapeSequenceColors=%@", _preEscapeSequenceColors);
         return NO;
     }
     return YES;
 }
 
 - (void)screenSelectColorPresetNamed:(NSString *)name {
+    // This is an escape-sequence-initiated color change. Like screenSetColor:profileKey:,
+    // we need to preserve baselines so reset operations restore to Edit Session values.
+    iTermColorPreset *settings = [iTermColorPresets presetWithName:name];
+    if (!settings) {
+        return;
+    }
+
+    if (!_preEscapeSequenceColors) {
+        _preEscapeSequenceColors = [[NSMutableDictionary alloc] init];
+    }
+
+    // Save baseline for KEY_USE_SEPARATE_COLORS_FOR_LIGHT_AND_DARK_MODE if not already saved.
+    // This is needed to correctly transform color keys during reset operations.
+    // Use boolForKey to get the effective value (respecting defaults).
+    const BOOL currentlyUsesModes = [iTermProfilePreferences boolForKey:KEY_USE_SEPARATE_COLORS_FOR_LIGHT_AND_DARK_MODE
+                                                              inProfile:_profile];
+    if (!_preEscapeSequenceColors[KEY_USE_SEPARATE_COLORS_FOR_LIGHT_AND_DARK_MODE]) {
+        _preEscapeSequenceColors[KEY_USE_SEPARATE_COLORS_FOR_LIGHT_AND_DARK_MODE] = @(currentlyUsesModes);
+    }
+
+    // Build a dictionary of baselines to preserve. For each color the preset will change,
+    // save the current profile value if we don't already have a baseline.
+    // Use the CURRENT key format (before preset changes the mode setting).
+    NSMutableDictionary *baselinesToPreserve = [NSMutableDictionary dictionary];
+    baselinesToPreserve[KEY_USE_SEPARATE_COLORS_FOR_LIGHT_AND_DARK_MODE] =
+        _preEscapeSequenceColors[KEY_USE_SEPARATE_COLORS_FOR_LIGHT_AND_DARK_MODE];
+
+    for (NSString *baseColorKey in [ProfileModel colorKeysWithModes:NO]) {
+        if (currentlyUsesModes) {
+            // Save both light and dark mode keys
+            NSString *lightKey = [baseColorKey stringByAppendingString:COLORS_LIGHT_MODE_SUFFIX];
+            NSString *darkKey = [baseColorKey stringByAppendingString:COLORS_DARK_MODE_SUFFIX];
+            if (_profile[lightKey]) {
+                id existingBaseline = _preEscapeSequenceColors[lightKey];
+                baselinesToPreserve[lightKey] = existingBaseline ?: _profile[lightKey];
+            }
+            if (_profile[darkKey]) {
+                id existingBaseline = _preEscapeSequenceColors[darkKey];
+                baselinesToPreserve[darkKey] = existingBaseline ?: _profile[darkKey];
+            }
+        } else {
+            if (_profile[baseColorKey]) {
+                id existingBaseline = _preEscapeSequenceColors[baseColorKey];
+                baselinesToPreserve[baseColorKey] = existingBaseline ?: _profile[baseColorKey];
+            }
+        }
+    }
+
     [self setColorsFromPresetNamed:name];
+
+    // Restore baselines after setColorsFromPresetNamed cleared them.
+    [_preEscapeSequenceColors addEntriesFromDictionary:baselinesToPreserve];
 }
 
 - (void)screenSetCurrentTabColor:(NSColor *)color {
-    [self setTabColor:color];
+    [self setTabColor:color fromEscapeSequence:YES];
     id<WindowControllerInterface> term = [_delegate parentWindow];
     [term updateTabColors];
 }
@@ -15065,15 +15311,75 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
 }
 
 - (void)setTabColor:(NSColor *)color {
-    NSDictionary *dict;
-    if (color) {
-        dict = @{ [self amendedColorKey:KEY_USE_TAB_COLOR]: @YES,
-                  [self amendedColorKey:KEY_TAB_COLOR]: [ITAddressBookMgr encodeColor:color] };
-    } else {
-        dict = @{ [self amendedColorKey:KEY_USE_TAB_COLOR]: @NO };
-    }
+    [self setTabColor:color fromEscapeSequence:NO];
+}
 
-    [self setSessionSpecificProfileValues:dict];
+- (void)setTabColor:(NSColor *)color fromEscapeSequence:(BOOL)fromEscapeSequence {
+    NSString *useTabColorKey = [self amendedColorKey:KEY_USE_TAB_COLOR];
+    NSString *tabColorKey = [self amendedColorKey:KEY_TAB_COLOR];
+
+    if (fromEscapeSequence) {
+        // Save baselines before modifying, if not already saved.
+        if (!_preEscapeSequenceColors) {
+            _preEscapeSequenceColors = [[NSMutableDictionary alloc] init];
+        }
+
+        // Retain baselines since setSessionSpecificProfileValues will remove them from
+        // _preEscapeSequenceColors, potentially deallocating them.
+        id useTabColorBaseline = [[_preEscapeSequenceColors[useTabColorKey] retain] autorelease];
+        id tabColorBaseline = [[_preEscapeSequenceColors[tabColorKey] retain] autorelease];
+
+        if (!useTabColorBaseline) {
+            useTabColorBaseline = @([iTermProfilePreferences boolForKey:useTabColorKey inProfile:_profile]);
+        }
+        if (!tabColorBaseline) {
+            tabColorBaseline = _profile[tabColorKey];
+        }
+
+        // If this is a reset (color == nil) and we have baselines, restore them.
+        if (!color && (useTabColorBaseline || tabColorBaseline)) {
+            NSMutableDictionary *valuesToRestore = [NSMutableDictionary dictionary];
+            if (useTabColorBaseline) {
+                valuesToRestore[useTabColorKey] = useTabColorBaseline;
+                [_preEscapeSequenceColors removeObjectForKey:useTabColorKey];
+            }
+            if (tabColorBaseline) {
+                valuesToRestore[tabColorKey] = tabColorBaseline;
+                [_preEscapeSequenceColors removeObjectForKey:tabColorKey];
+            }
+            [self setSessionSpecificProfileValues:valuesToRestore];
+            return;
+        }
+
+        // Setting a new color - apply the change
+        NSDictionary *dict;
+        if (color) {
+            dict = @{ useTabColorKey: @YES,
+                      tabColorKey: [ITAddressBookMgr encodeColor:color] };
+        } else {
+            dict = @{ useTabColorKey: @NO };
+        }
+        [self setSessionSpecificProfileValues:dict];
+
+        // Restore baselines after setSessionSpecificProfileValues clears them.
+        if (useTabColorBaseline) {
+            _preEscapeSequenceColors[useTabColorKey] = useTabColorBaseline;
+        }
+        if (tabColorBaseline) {
+            _preEscapeSequenceColors[tabColorKey] = tabColorBaseline;
+        }
+    } else {
+        // Not from escape sequence (Edit Session) - just apply the change.
+        // setSessionSpecificProfileValues will clear any baselines.
+        NSDictionary *dict;
+        if (color) {
+            dict = @{ useTabColorKey: @YES,
+                      tabColorKey: [ITAddressBookMgr encodeColor:color] };
+        } else {
+            dict = @{ useTabColorKey: @NO };
+        }
+        [self setSessionSpecificProfileValues:dict];
+    }
 }
 
 - (void)screenSetTabColorRedComponentTo:(CGFloat)color {
@@ -15081,7 +15387,8 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
     [self setTabColor:[curColor it_colorWithRed:color
                                           green:curColor.greenComponent
                                            blue:curColor.blueComponent
-                                          alpha:1]];
+                                          alpha:1]
+   fromEscapeSequence:YES];
     [[_delegate parentWindow] updateTabColors];
 }
 
@@ -15090,7 +15397,8 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
     [self setTabColor:[curColor it_colorWithRed:curColor.redComponent
                                           green:color
                                            blue:curColor.blueComponent
-                                          alpha:1]];
+                                          alpha:1]
+   fromEscapeSequence:YES];
     [[_delegate parentWindow] updateTabColors];
 }
 
@@ -15099,7 +15407,8 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
     [self setTabColor:[curColor it_colorWithRed:curColor.redComponent
                                           green:curColor.greenComponent
                                            blue:color
-                                          alpha:1]];
+                                          alpha:1]
+   fromEscapeSequence:YES];
     [[_delegate parentWindow] updateTabColors];
 }
 
@@ -15146,7 +15455,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
 
 - (void)turnOffMouseReportingOrOffer:(VT100Terminal *)terminal {
     DLog(@"begin");
-    NSNumber *number = [[NSUserDefaults standardUserDefaults] objectForKey:kTurnOffMouseReportingOnHostChangeUserDefaultsKey];
+    NSNumber *number = [[iTermUserDefaults userDefaults] objectForKey:kTurnOffMouseReportingOnHostChangeUserDefaultsKey];
     if ([number boolValue]) {
         DLog(@"Turn off mouse reporting automatically");
         terminal.mouseMode = MOUSE_REPORTING_NONE;
@@ -15157,7 +15466,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
 
 - (void)turnOffDEC2048OrOffer:(VT100Terminal *)terminal {
     DLog(@"begin");
-    NSNumber *number = [[NSUserDefaults standardUserDefaults] objectForKey:kTurnOffDEC2048OnHostChangeUserDefaultsKey];
+    NSNumber *number = [[iTermUserDefaults userDefaults] objectForKey:kTurnOffDEC2048OnHostChangeUserDefaultsKey];
     if ([number boolValue]) {
         DLog(@"Turn off DEC 2048 automatically");
         terminal.sendResizeNotifications = NO;
@@ -15274,7 +15583,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
                 break;
 
             case 1: // Always
-                [[NSUserDefaults standardUserDefaults] setBool:YES
+                [[iTermUserDefaults userDefaults] setBool:YES
                                                         forKey:userDefaultsKey];
                 // FALL THROUGH
             case 0: // Yes
@@ -15293,7 +15602,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
                 break;
 
             case 2: // Never
-                [[NSUserDefaults standardUserDefaults] setBool:NO
+                [[iTermUserDefaults userDefaults] setBool:NO
                                                         forKey:userDefaultsKey];
         }
     }];
@@ -15301,7 +15610,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
 }
 
 - (void)offerToTurnOffFocusReportingRespectingSavedPreference:(VT100Terminal *)terminal {
-    NSNumber *number = [[NSUserDefaults standardUserDefaults] objectForKey:kTurnOffFocusReportingOnHostChangeUserDefaultsKey];
+    NSNumber *number = [[iTermUserDefaults userDefaults] objectForKey:kTurnOffFocusReportingOnHostChangeUserDefaultsKey];
     if ([number boolValue]) {
         if (terminal) {
             terminal.reportFocus = NO;
@@ -15341,7 +15650,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
                 break;
 
             case 1: // Always
-                [[NSUserDefaults standardUserDefaults] setBool:YES
+                [[iTermUserDefaults userDefaults] setBool:YES
                                                         forKey:kTurnOffFocusReportingOnHostChangeUserDefaultsKey];
                 [_screen performBlockWithJoinedThreads:^(VT100Terminal *terminal,
                                                          VT100ScreenMutableState *mutableState,
@@ -15351,7 +15660,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
                 break;
 
             case 2: // Never
-                [[NSUserDefaults standardUserDefaults] setBool:NO
+                [[iTermUserDefaults userDefaults] setBool:NO
                                                         forKey:kTurnOffFocusReportingOnHostChangeUserDefaultsKey];
         }
     }];
@@ -15396,6 +15705,11 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
                                commandLine:self.variablesScope.commandLine];
     [self.variablesScope setValue:newPath forVariableNamed:iTermVariableKeySessionPath];
     [_directoryTracker screenDidChangeCurrentDirectory];
+}
+
+- (void)screenPollLocalDirectoryOnly {
+    DLog(@"screenPollLocalDirectoryOnly");
+    [_directoryTracker pollLocalDirectoryOnly];
 }
 
 - (void)screenDidReceiveCustomEscapeSequenceWithParameters:(NSDictionary<NSString *, NSString *> *)parameters
@@ -15729,7 +16043,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
     NSDictionary *userInfo = @{
         PTYCommandDidExitUserInfoKeyRemoteHost: (id)[_screen remoteHostOnLine:line] ?: (id)[NSNull null],
         PTYCommandDidExitUserInfoKeyDirectory: (id)[_screen workingDirectoryOnLine:line] ?: (id)[NSNull null],
-        PTYCommandDidExitUserInfoKeySnapshot: [self contentSnapshot],
+        PTYCommandDidExitUserInfoKeyDataSource: self.screen,
         PTYCommandDidExitUserInfoKeyStartLine: @(outputRange.start.y),
         PTYCommandDidExitUserInfoKeyLineCount: @(outputRange.end.y - outputRange.start.y + 1),
         PTYCommandDidExitUserInfoKeyCommand: (id)command ?: (id)[NSNull null],
@@ -15763,13 +16077,12 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
         const VT100GridRange lineRange = [_screen lineNumberRangeOfInterval:maybeMark.entry.interval];
         const int line = lineRange.location;
         const VT100GridCoordRange outputRange = [_screen rangeOfOutputForCommandMark:maybeMark];
-#warning TODO: It is rather wasteful to make a snapshot here. Only do it if someone wants it.
         NSDictionary *userInfo = @{
             PTYCommandDidExitUserInfoKeyCommand: maybeMark.command ?: (id)[NSNull null],
             PTYCommandDidExitUserInfoKeyExitCode: @(maybeMark.code),
             PTYCommandDidExitUserInfoKeyRemoteHost: (id)[_screen remoteHostOnLine:line] ?: (id)[NSNull null],
             PTYCommandDidExitUserInfoKeyDirectory: (id)[_screen workingDirectoryOnLine:line] ?: (id)[NSNull null],
-            PTYCommandDidExitUserInfoKeySnapshot: [self contentSnapshot],
+            PTYCommandDidExitUserInfoKeyDataSource: self.screen,
             PTYCommandDidExitUserInfoKeyStartLine: @(outputRange.start.y),
             PTYCommandDidExitUserInfoKeyLineCount: @(outputRange.end.y - outputRange.start.y + 1),
             PTYCommandDidExitUserInfoKeyURL: [self urlForPromptMark:maybeMark] };
@@ -16183,7 +16496,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
         existingAnnouncement.timeout = 10;
     }
     if ([_bellRate value] < kThresholdForBellMovingAverageToInferAnnoyance &&
-        [[NSUserDefaults standardUserDefaults] boolForKey:kSilenceAnnoyingBellAutomatically]) {
+        [[iTermUserDefaults userDefaults] boolForKey:kSilenceAnnoyingBellAutomatically]) {
         // Silence automatically
         _ignoreBellUntil = now + 60;
         return YES;
@@ -16192,7 +16505,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
     if ([_bellRate value] < kThresholdForBellMovingAverageToInferAnnoyance &&
         !existingAnnouncement &&
         (now - _annoyingBellOfferDeclinedAt > kTimeToWaitAfterDecline) &&
-        ![[NSUserDefaults standardUserDefaults] boolForKey:kSuppressAnnoyingBellOffer]) {
+        ![[iTermUserDefaults userDefaults] boolForKey:kSuppressAnnoyingBellOffer]) {
         iTermAnnouncementViewController *announcement = nil;
         if (audible) {
             DLog(@"Want to show a bell announcement. The bell is audible.");
@@ -16229,13 +16542,13 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
 
                     case 2: // Never offer again
                         DLog(@"Never offer again");
-                        [[NSUserDefaults standardUserDefaults] setBool:YES
+                        [[iTermUserDefaults userDefaults] setBool:YES
                                                                 forKey:kSuppressAnnoyingBellOffer];
                         break;
 
                     case 3:  // Silence automatically
                         DLog(@"Silence automatically");
-                        [[NSUserDefaults standardUserDefaults] setBool:YES
+                        [[iTermUserDefaults userDefaults] setBool:YES
                                                                 forKey:kSilenceAnnoyingBellAutomatically];
                         break;
                 }
@@ -16269,7 +16582,7 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
 
                     case 1: // Never offer again
                         DLog(@"Don't offer again");
-                        [[NSUserDefaults standardUserDefaults] setBool:YES
+                        [[iTermUserDefaults userDefaults] setBool:YES
                                                                 forKey:kSuppressAnnoyingBellOffer];
                         break;
                 }
@@ -16464,7 +16777,7 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
     id<VT100RemoteHostReading> currentRemoteHost = [self currentHost];
 
     NSString *theKey = [self shellIntegrationUpgradeUserDefaultsKeyForHost:currentRemoteHost];
-    NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
+    NSUserDefaults *userDefaults = [iTermUserDefaults userDefaults];
     if ([userDefaults boolForKey:theKey]) {
         return;
     }
@@ -16917,6 +17230,8 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
 }
 
 - (void)screenRestoreColorsFromSlot:(VT100SavedColorsSlot *)slot {
+    // This is an escape-sequence-initiated color change (PopColors).
+    // Preserve baselines so reset operations restore to Edit Session values.
     const BOOL dark = _screen.colorMap.darkMode;
     NSMutableDictionary *dict = [[@{ iTermAmendedColorKey(KEY_FOREGROUND_COLOR, _profile, dark): slot.text.dictionaryValue,
                                      iTermAmendedColorKey(KEY_BACKGROUND_COLOR, _profile, dark): slot.background.dictionaryValue,
@@ -16930,7 +17245,30 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
             dict[profileKey] = [slot.indexedColors[i] dictionaryValue];
         }
     }
+
+    // Save baselines for keys we're about to modify
+    NSMutableDictionary *baselinesToPreserve = [NSMutableDictionary dictionary];
+    for (NSString *key in dict) {
+        id existingBaseline = [[_preEscapeSequenceColors[key] retain] autorelease];
+        if (existingBaseline) {
+            baselinesToPreserve[key] = existingBaseline;
+        } else {
+            id currentValue = _profile[key];
+            if (currentValue) {
+                baselinesToPreserve[key] = currentValue;
+            }
+        }
+    }
+
     [self setSessionSpecificProfileValues:dict];
+
+    // Restore baselines after setSessionSpecificProfileValues clears them
+    if (baselinesToPreserve.count > 0) {
+        if (!_preEscapeSequenceColors) {
+            _preEscapeSequenceColors = [[NSMutableDictionary alloc] init];
+        }
+        [_preEscapeSequenceColors addEntriesFromDictionary:baselinesToPreserve];
+    }
 }
 
 - (BOOL)supportsOSC52 {
@@ -16938,7 +17276,7 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
         DLog(@"Clipboard access allowed");
         return YES;
     }
-    if ([[NSUserDefaults standardUserDefaults] objectForKey:kPreferenceKeyAllowClipboardAccessFromTerminal] != nil) {
+    if ([[iTermUserDefaults userDefaults] objectForKey:kPreferenceKeyAllowClipboardAccessFromTerminal] != nil) {
         DLog(@"Clipboard access explicitly denied");
         return NO;
     }
@@ -17427,10 +17765,12 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
     if (_pasteHelper.pasteContext.bytesWritten == 0 &&
         (_pasteHelper.pasteContext.pasteEvent.flags & kPasteFlagsBracket) &&
         _screen.terminalBracketedPasteMode) {
+        DLog(@"Will write first chunk of bracketed paste: %@", string);
         NSString *prefix = [_pasteHelper.pasteContext.pasteEvent.originalString it_substringToIndex:4];
         [self watchForPasteBracketingOopsieWithPrefix:prefix
                                              andWrite:string];
     } else {
+        DLog(@"Writing regular chunk");
         [self writeTask:string];
     }
 }
@@ -17741,7 +18081,7 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
         return;
     }
     NSString *const bypassKey = @"NoSyncBypassConfirmAIPrompt";
-    if (defaultString.length > 0 && bypassable && [[NSUserDefaults standardUserDefaults] boolForKey:bypassKey]) {
+    if (defaultString.length > 0 && bypassable && [[iTermUserDefaults userDefaults] boolForKey:bypassKey]) {
         completion(defaultString);
         return;
     }
@@ -17818,7 +18158,7 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
     [alert beginSheetModalForWindow:self.view.window completionHandler:^(NSModalResponse button) {
         if (button == NSAlertFirstButtonReturn) {
             if (disableButton.state == NSControlStateValueOn) {
-                [[NSUserDefaults standardUserDefaults] setBool:YES forKey:bypassKey];
+                [[iTermUserDefaults userDefaults] setBool:YES forKey:bypassKey];
             }
             completion([[[input string] copy] autorelease]);
         }
@@ -17830,7 +18170,7 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
     if (_textview.selection.hasSelection) {
         return _textview.selection;
     }
-    id<VT100ScreenMarkReading> mark = _selectedCommandMark ?: _screen.lastCommandMark;
+    id<VT100ScreenMarkReading> mark = self.selectedCommandMark ?: _screen.lastCommandMark;
     if (mark) {
         if (truncated) {
             *truncated = NO;
@@ -17871,7 +18211,7 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
         }
         return nil;
     }
-    id<VT100ScreenMarkReading> mark = _selectedCommandMark ?: _screen.lastCommandMark;
+    id<VT100ScreenMarkReading> mark = self.selectedCommandMark ?: _screen.lastCommandMark;
     return mark.command;
 }
 
@@ -17879,9 +18219,9 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
     if (_textview.selection.hasSelection) {
         return [[_textview selectedText] ellipsizedDescriptionNoLongerThan:16];
     }
-    if (_selectedCommandMark) {
-        if (_selectedCommandMark.command.length) {
-            return _selectedCommandMark.command;
+    if (self.selectedCommandMark) {
+        if (self.selectedCommandMark.command.length) {
+            return self.selectedCommandMark.command;
         }
         return @"Command output";
     }
@@ -17898,9 +18238,9 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
     if (_textview.selection.hasSelection) {
         return [[_textview selectedText] ellipsizedDescriptionNoLongerThan:16].stringEnclosedInMarkdownInlineCode ?: @"some selected text";
     }
-    if (_selectedCommandMark) {
-        if (_selectedCommandMark.command.length) {
-            return _selectedCommandMark.command.stringEnclosedInMarkdownInlineCode;
+    if (self.selectedCommandMark) {
+        if (self.selectedCommandMark.command.length) {
+            return self.selectedCommandMark.command.stringEnclosedInMarkdownInlineCode;
         }
         return @"the selected command";
     }
@@ -18026,6 +18366,22 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
 
 - (NSColor *)sessionViewTabColor {
     return self.tabColor;
+}
+
+- (BOOL)sessionViewUseActivePaneBorder {
+    return _useActivePaneBorder;
+}
+
+- (NSColor *)sessionViewActivePaneBorderColor {
+    return _activePaneBorderColor;
+}
+
+- (BOOL)sessionViewIsActiveSession {
+    return [_delegate sessionIsActiveInTab:self];
+}
+
+- (BOOL)sessionViewIsInTraditionalFullScreen {
+    return [[_delegate realParentWindow] fullScreen];
 }
 
 - (NSMenu *)sessionViewContextMenu {
@@ -18192,12 +18548,14 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
 }
 
 - (id<VT100ScreenMarkReading>)textViewSelectedCommandMark {
-    return _selectedCommandMark;
+    return self.selectedCommandMark;
 }
 
 - (void)textViewReloadSelectedCommand {
     if ([iTermPreferences boolForKey:kPreferenceKeyClickToSelectCommand] == NO) {
-        _selectedCommandMark = nil;
+        if (self.selectedCommandMark) {
+            _selectedScreenMark = nil;
+        }
     }
     [self updateSearchRange];
 }
@@ -18208,7 +18566,7 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
 
 - (void)textViewSelectCommandRegionAtCoord:(VT100GridCoord)coord {
     id<VT100ScreenMarkReading> mark = [_screen commandMarkAtOrBeforeLine:coord.y];
-    if (mark == _selectedCommandMark) {
+    if (mark == _selectedScreenMark) {
         mark = nil;
     }
     const BOOL allowed = [iTermPreferences boolForKey:kPreferenceKeyClickToSelectCommand];
@@ -18218,8 +18576,8 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
     [self selectCommandWithMarkIfSafe:mark];
     if (allowed && mark != nil) {
         NSString *const warningKey = @"NoSyncUserHasSelectedCommand";
-        if (mark != nil && ![[NSUserDefaults standardUserDefaults] boolForKey:warningKey]) {
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:warningKey];
+        if (mark != nil && ![[iTermUserDefaults userDefaults] boolForKey:warningKey]) {
+            [[iTermUserDefaults userDefaults] setBool:YES forKey:warningKey];
             [self showCommandSelectionInfo];
         }
     }
@@ -18238,15 +18596,27 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
             return;
         }
     }
-    [self selectCommandWithMark:mark];
+    if (!mark || mark.isPrompt) {
+        [self selectCommandWithMark:mark];
+    }
+}
+
+- (void)selectScreenMark:(id<VT100ScreenMarkReading>)mark {
+    if (_selectedScreenMark.isPrompt && (mark == nil || mark.isPrompt)) {
+        [self selectCommandWithMark:mark];
+    } else {
+        [self selectCommandWithMark:nil];
+        _selectedScreenMark = mark;
+    }
 }
 
 - (void)selectCommandWithMark:(id<VT100ScreenMarkReading>)mark {
-    id<VT100ScreenMarkReading> previous = _selectedCommandMark;
-    _selectedCommandMark = mark;
+    assert(mark == nil || mark.isPrompt);
+    id<VT100ScreenMarkReading> previous = _selectedScreenMark;
+    _selectedScreenMark = mark;
     [self updateSearchRange];
     _screen.savedFindContextAbsPos = 0;
-    if (previous != _selectedCommandMark) {
+    if (previous != _selectedScreenMark) {
         [_textview requestDelegateRedraw];
     }
 }
@@ -18278,7 +18648,7 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
         return;
     }
     NSString *const warningKey = @"NoSyncScrollingHorizontally";
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:warningKey]) {
+    if ([[iTermUserDefaults userDefaults] boolForKey:warningKey]) {
         return;
     }
     NSString *identifier = @"HorizontalScrollWarning";
@@ -18300,14 +18670,14 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
                 [[PreferencePanel sharedInstance] openToPreferenceWithKey:kPreferenceKeyReportHorizontalScrollEvents];
                 break;
         }
-        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:warningKey];
+        [[iTermUserDefaults userDefaults] setBool:YES forKey:warningKey];
     }];
     [self queueAnnouncement:announcement identifier:identifier];
 
 }
 
 - (void)textViewRemoveSelectedCommand {
-    if (!_selectedCommandMark) {
+    if (![self selectedCommandMark]) {
         return;
     }
     [self removeSelectedCommandRange];
@@ -18378,25 +18748,33 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
     }
 }
 
-- (void)removeSelectedCommandRange {
-    if (!_selectedCommandMark) {
+- (void)textViewSendCustomButtonCode:(int)code {
+    if (!self.terminalIsTrusted) {
         return;
     }
-    _selectedCommandMark = nil;
+    NSString *s = [NSString stringWithFormat:@"\033[?1337;%d~", code];
+    [self screenSendReportData:[s dataUsingEncoding:NSUTF8StringEncoding]];
+}
+
+- (void)removeSelectedCommandRange {
+    if (!self.selectedCommandMark) {
+        return;
+    }
+    _selectedScreenMark = nil;
     [self updateSearchRange];
     _screen.savedFindContextAbsPos = 0;
     [_textview requestDelegateRedraw];
 }
 
 - (void)updateSearchRange {
-    if (!_selectedCommandMark) {
+    if (!self.selectedCommandMark) {
         _textview.findOnPageHelper.absLineRange = NSMakeRange(0, 0);
         _view.findDriver.viewController.hasLineRange = NO;
         return;
     }
-    VT100GridAbsCoordRange range = [self rangeOfCommandAndOutputForMark:_selectedCommandMark
+    VT100GridAbsCoordRange range = [self rangeOfCommandAndOutputForMark:self.selectedCommandMark
                                                  includeSucessorDivider:YES];
-    if (_selectedCommandMark.lineStyle) {
+    if (self.selectedCommandMark.lineStyle) {
         _textview.findOnPageHelper.absLineRange = NSMakeRange(MAX(0, range.start.y - 1),
                                                               range.end.y - range.start.y + 1);
     } else {
@@ -19590,7 +19968,7 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
         return;
     }
     NSString *neverPromptUserDefaultsKey = @"NoSyncNeverPromptToChangeOption";
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:neverPromptUserDefaultsKey]) {
+    if ([[iTermUserDefaults userDefaults] boolForKey:neverPromptUserDefaultsKey]) {
         // User said never to ask.
         return;
     }
@@ -19641,7 +20019,7 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
                                                             [iTermProfilePreferences setInt:OPT_ESC forKey:profileKey inProfile:profile model:[ProfileModel sharedInstance]];
                                                         }
                                                     } else {
-                                                        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:neverPromptUserDefaultsKey];
+                                                        [[iTermUserDefaults userDefaults] setBool:YES forKey:neverPromptUserDefaultsKey];
                                                     }
                                                 }];
     static NSString *const identifier = @"OfferToChangeOptionKeyToSendESC";
@@ -20568,6 +20946,28 @@ static const NSTimeInterval PTYSessionFocusReportBellSquelchTimeIntervalThreshol
     _execDidFail = YES;
 }
 
+- (BOOL)screenOffscreenCommandLineShouldBeVisibleForCurrentCommand {
+    if (![iTermProfilePreferences boolForKey:KEY_SHOW_OFFSCREEN_COMMANDLINE_FOR_CURRENT_COMMAND
+                                   inProfile:self.profile]) {
+        return NO;
+    }
+    if (_screen.terminalSoftAlternateScreenMode) {
+        return NO;
+    }
+    return YES;
+}
+
+- (void)screenUpdateBlock:(NSString *)blockID action:(iTermUpdateBlockAction)action {
+    switch (action) {
+        case iTermUpdateBlockActionFold:
+            [_textview foldBlock:blockID];
+            break;
+        case iTermUpdateBlockActionUnfold:
+            [_textview unfoldBlock:blockID];
+            break;
+    }
+}
+
 - (CGFloat)composerManagerLineHeight:(iTermComposerManager *)composerManager {
     return _textview.lineHeight;
 }
@@ -21376,7 +21776,7 @@ getOptionKeyBehaviorLeft:(iTermOptionKeyBehavior *)left
         return;
     }
 
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:kSuppressCaptureOutputToolNotVisibleWarning]) {
+    if ([[iTermUserDefaults userDefaults] boolForKey:kSuppressCaptureOutputToolNotVisibleWarning]) {
         return;
     }
 
@@ -21394,7 +21794,7 @@ getOptionKeyBehaviorLeft:(iTermOptionKeyBehavior *)left
                 break;
 
             case 1:
-                [[NSUserDefaults standardUserDefaults] setBool:YES
+                [[iTermUserDefaults userDefaults] setBool:YES
                                                         forKey:kSuppressCaptureOutputToolNotVisibleWarning];
                 break;
         }
@@ -21411,7 +21811,7 @@ getOptionKeyBehaviorLeft:(iTermOptionKeyBehavior *)left
 
 - (void)triggerSideEffectShowShellIntegrationRequiredAnnouncement {
     [iTermGCD assertMainQueueSafe];
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:kSuppressCaptureOutputRequiresShellIntegrationWarning]) {
+    if ([[iTermUserDefaults userDefaults] boolForKey:kSuppressCaptureOutputRequiresShellIntegrationWarning]) {
         return;
     }
     NSString *theTitle = @"A Capture Output trigger fired, but Shell Integration is not installed.";
@@ -21425,7 +21825,7 @@ getOptionKeyBehaviorLeft:(iTermOptionKeyBehavior *)left
                 break;
 
             case 1:
-                [[NSUserDefaults standardUserDefaults] setBool:YES
+                [[iTermUserDefaults userDefaults] setBool:YES
                                                         forKey:kSuppressCaptureOutputRequiresShellIntegrationWarning];
                 break;
         }
@@ -21459,7 +21859,7 @@ getOptionKeyBehaviorLeft:(iTermOptionKeyBehavior *)left
                             silent:(BOOL)silent
                       triggerTitle:(NSString * _Nonnull)triggerName {
     if (self.hasCoprocess) {
-        if (identifier && [[NSUserDefaults standardUserDefaults] boolForKey:identifier]) {
+        if (identifier && [[iTermUserDefaults userDefaults] boolForKey:identifier]) {
             return;
         }
         NSString *message = [NSString stringWithFormat:@"%@: Can't run two coprocesses at once.", triggerName];
@@ -21474,7 +21874,7 @@ getOptionKeyBehaviorLeft:(iTermOptionKeyBehavior *)left
             }
             switch (selection) {
                 case 0:
-                    [[NSUserDefaults standardUserDefaults] setBool:YES
+                    [[iTermUserDefaults userDefaults] setBool:YES
                                                             forKey:identifier];
                     break;
             }
@@ -21584,7 +21984,18 @@ getOptionKeyBehaviorLeft:(iTermOptionKeyBehavior *)left
 - (void)pasteboardReporter:(iTermPasteboardReporter *)sender reportPasteboard:(NSString *)pasteboard {
     NSData *data = [_screen.terminalOutput reportPasteboard:pasteboard
                                                    contents:[NSString stringFromPasteboard] ?: @""];
-    [self screenSendReportData:data];
+    if (_tmuxController.shouldHandleOSC52Queries) {
+        // tmux > 3.6 with get-clipboard >= 2 or tmux 3.6 with set-clipboard < 2
+        DLog(@"Handling OSC 52 query");
+        [self writeLatin1EncodedData:data broadcastAllowed:NO reporting:YES];
+    } else if (!self.isTmuxClient) {
+        // Non-tmux.
+        DLog(@"Non-tmux");
+        [self screenSendReportData:data];
+    } else {
+        DLog(@"Ignore");
+        return;
+    }
     [_view showUnobtrusiveMessage:[NSString stringWithFormat:@"Clipboard contents reported"]
                          duration:3];
 }

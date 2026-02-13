@@ -58,7 +58,7 @@ extern NSString *const iTermApplicationWillTerminate;
 }
 
 + (BOOL)stateRestorationEnabled {
-    return ([[NSUserDefaults standardUserDefaults] boolForKey:@"NSQuitAlwaysKeepsWindows"] ||
+    return ([[iTermUserDefaults userDefaults] boolForKey:@"NSQuitAlwaysKeepsWindows"] ||
             [self shouldRestoreStateOnNextLaunch]);
 }
 
@@ -74,7 +74,7 @@ static BOOL gForceSaveState;
 
 + (void)setForceSaveState:(BOOL)forceSaveState {
     gForceSaveState = forceSaveState;
-    [[NSUserDefaults standardUserDefaults] setBool:forceSaveState forKey:@"NoSyncWindowRestoresWorkspaceAtLaunch"];
+    [[iTermUserDefaults userDefaults] setBool:forceSaveState forKey:@"NoSyncWindowRestoresWorkspaceAtLaunch"];
 }
 
 - (instancetype)init {
@@ -133,6 +133,10 @@ static BOOL gForceSaveState;
 
 - (NSInteger)numberOfWindowsRestored {
     return _driver.numberOfWindowsRestored;
+}
+
+- (BOOL)restoring {
+    return !_ready;
 }
 
 - (void)saveRestorableState {

@@ -183,7 +183,12 @@ class iTermSecureUserDefaults: NSObject {
 
 // Save secure user defaults here if the home directory is on a network mount.
 // Secure user defaults must be writable only by root and network mounts obviously can't do that.
-fileprivate let FallbackFolder = "/usr/local/iTerm2-secure-settings"
+fileprivate var FallbackFolder: String {
+    if let suite = iTermUserDefaults.customSuiteName() as String? {
+        return "/usr/local/\(suite)-secure-settings"
+    }
+    return "/usr/local/iTerm2-secure-settings"
+}
 
 // (path, is unix filesystem)
 fileprivate var secureUserDefaultsFolderIsOnUnixFilesystem: (String, Bool)?
@@ -402,7 +407,7 @@ class SecureUserDefault<T: SecureUserDefaultStringTranscodable & Codable & Equat
         // iTermAdvancedSettingsModel because this is called during
         // iTermAdvancedSettingsModel.initialize, so its values may not be
         // loaded yet.
-        let pathsToIgnore = UserDefaults.standard.string(forKey: "PathsToIgnore")?.components(
+        let pathsToIgnore = iTermUserDefaults.userDefaults().string(forKey: "PathsToIgnore")?.components(
             separatedBy: ",") ?? []
         DLog("pathsToIgnore=\(pathsToIgnore)")
         let isLocal = FileManager.default.fileIsLocal(
@@ -479,7 +484,10 @@ class SecureUserDefault<T: SecureUserDefaultStringTranscodable & Codable & Equat
         DLog("delete \(key)")
         let filename = try path(key, create: false)
         DLog("Remove \(filename)")
-        try FileManager.default.removeItem(at: filename)
+        if (FileManager.default.fileExists(atPath: filename.path)) {
+            DLog("Item exists, remove it")
+            try FileManager.default.removeItem(at: filename)
+        }
 
         NotificationCenter.default.post(name: secureUserDefaultDidChange, object: key)
     }

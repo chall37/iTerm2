@@ -28,14 +28,16 @@
 
 #include <wctype.h>
 #import "DebugLogging.h"
-#import "PasteboardHistory.h"
 #import "NSDateFormatterExtras.h"
+#import "NSFileManager+iTerm.h"
 #import "NSStringITerm.h"
+#import "PasteboardHistory.h"
 #import "PopupModel.h"
 #import "iTermAdvancedSettingsModel.h"
 #import "iTermController.h"
 #import "iTermPreferences.h"
 #import "iTermSecureKeyboardEntryController.h"
+#import "iTermUserDefaults.h"
 
 #define PBHKEY_ENTRIES @"Entries"
 #define PBHKEY_VALUE @"Value"
@@ -71,8 +73,8 @@
         int maxEntries = [PasteboardHistory maxEntries];
         // MaxPasteHistoryEntries is a legacy thing. I'm not removing it because it's a security
         // issue for some people.
-        if ([[NSUserDefaults standardUserDefaults] objectForKey:@"MaxPasteHistoryEntries"]) {
-            maxEntries = [[NSUserDefaults standardUserDefaults] integerForKey:@"MaxPasteHistoryEntries"];
+        if ([[iTermUserDefaults userDefaults] objectForKey:@"MaxPasteHistoryEntries"]) {
+            maxEntries = [[iTermUserDefaults userDefaults] integerForKey:@"MaxPasteHistoryEntries"];
             if (maxEntries < 0) {
                 maxEntries = 0;
             }
@@ -88,12 +90,7 @@
         maxEntries_ = maxEntries;
         entries_ = [[NSMutableArray alloc] init];
 
-
-        path_ = [NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES) lastObject];
-        NSString *appname = [[NSBundle mainBundle] objectForInfoDictionaryKey:(NSString *)kCFBundleNameKey];
-        path_ = [path_ stringByAppendingPathComponent:appname];
-        [[NSFileManager defaultManager] createDirectoryAtPath:path_ withIntermediateDirectories:YES attributes:nil error:NULL];
-        path_ = [[path_ stringByAppendingPathComponent:@"pbhistory.plist"] copy];
+        path_ = [[[NSFileManager defaultManager] applicationSupportDirectory] stringByAppendingPathComponent:@"pbhistory.plist"];
 
         [self _loadHistoryFromDisk];
     }

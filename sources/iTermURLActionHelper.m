@@ -9,6 +9,14 @@
 
 #import "DebugLogging.h"
 #import "FileTransferManager.h"
+#import "NSEvent+iTerm.h"
+#import "NSHost+iTerm.h"
+#import "NSObject+iTerm.h"
+#import "NSURL+iTerm.h"
+#import "NSWorkspace+iTerm.h"
+#import "SCPPath.h"
+#import "SmartMatch.h"
+#import "URLAction.h"
 #import "iTermAdvancedSettingsModel.h"
 #import "iTermApplication.h"
 #import "iTermApplicationDelegate.h"
@@ -20,14 +28,6 @@
 #import "iTermTextExtractor.h"
 #import "iTermURLActionFactory.h"
 #import "iTermUserDefaults.h"
-#import "NSEvent+iTerm.h"
-#import "NSHost+iTerm.h"
-#import "NSObject+iTerm.h"
-#import "NSURL+iTerm.h"
-#import "NSWorkspace+iTerm.h"
-#import "SCPPath.h"
-#import "SmartMatch.h"
-#import "URLAction.h"
 
 @implementation iTermURLActionHelper {
     NSInteger _openTargetGeneration;
@@ -200,6 +200,11 @@
                                                range:&relativeRange
                                     ignoringNewlines:ignoringNewlines];
     if (result) {
+        *rangePtr = VT100GridAbsWindowedRangeFromWindowedRange(relativeRange,
+                                                               totalScrollbackOverflow);
+    } else if (relativeRange.coordRange.start.x >= 0 &&
+               coord.x >= [extractor lengthOfLine:coord.y]) {
+        // In trailing nulls - use word selection fallback result
         *rangePtr = VT100GridAbsWindowedRangeFromWindowedRange(relativeRange,
                                                                totalScrollbackOverflow);
     } else {
@@ -469,7 +474,7 @@ workingDirectory:(NSString *)workingDirectory
                                                            to:&range
                                              ignoringNewlines:ignoringNewlines
                                                actionRequired:NO
-                                              respectDividers:[[NSUserDefaults standardUserDefaults] boolForKey:kSelectionRespectsSoftBoundariesKey]];
+                                              respectDividers:[[iTermUserDefaults userDefaults] boolForKey:kSelectionRespectsSoftBoundariesKey]];
 
     iTermSelection *selection = [self.delegate urlActionHelperSelection:self];
     [selection beginSelectionAtAbsCoord:range.coordRange.start

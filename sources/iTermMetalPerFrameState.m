@@ -637,6 +637,7 @@ ambiguousIsDoubleWidth:(BOOL)ambiguousIsDoubleWidth
     }
 
     _imeInfo = [[iTermMetalIMEInfo alloc] init];
+    _imeInfo.cursorColor = [_configuration->_colorMap colorForKey:kColorMapIMECursor];
     // i indexes into buf.
     for (int i = 0; i < len; i++) {
         if (coord.y >= 0 && coord.y < _rows.count) {
@@ -812,6 +813,10 @@ ambiguousIsDoubleWidth:(BOOL)ambiguousIsDoubleWidth
 
 - (iTermRectArray *)buttonsBackgroundRects {
     return _configuration->_buttonsBackgroundRects;
+}
+
+- (NSArray<iTermButtonPillInfo *> *)buttonPillInfos NS_AVAILABLE_MAC(11) {
+    return _configuration->_buttonPillInfos;
 }
 
 - (BOOL)shouldDrawCursorGuideBelowText {

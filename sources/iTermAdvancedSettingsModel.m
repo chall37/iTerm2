@@ -6,16 +6,17 @@
 //
 //
 
+#import "iTermUserDefaults.h"
 #import <Foundation/Foundation.h>
 
 #if ITERM2_SHARED_ARC
 #import "iTerm2SharedARC-Swift.h"
 #endif
 
-#import "iTermAdvancedSettingsModel.h"
-#import "iTermUserDefaultsObserver.h"
 #import "NSApplication+iTerm.h"
 #import "NSStringITerm.h"
+#import "iTermAdvancedSettingsModel.h"
+#import "iTermUserDefaultsObserver.h"
 #import <objc/runtime.h>
 
 
@@ -110,7 +111,7 @@ static id sAdvancedSetting_##name; \
 } \
 + (NSString *)load_##name { \
     NSString *key = [self name##UserDefaultsKey]; \
-    id valueFromUserDefaults = [[NSUserDefaults standardUserDefaults] objectForKey:key]; \
+    id valueFromUserDefaults = [[iTermUserDefaults userDefaults] objectForKey:key]; \
     sAdvancedSetting_##name = valueFromUserDefaults ?: inverseTransformation(default); \
     return key; \
 } \
@@ -124,7 +125,7 @@ static id sAdvancedSetting_##name; \
 DEFINE_BOILERPLATE(name, podtype, type, default, description, transformation, inverseTransformation) \
 + (void)set##capitalizedName :(podtype)newValue { \
     sAdvancedSetting_##name = inverseTransformation(newValue); \
-    [[NSUserDefaults standardUserDefaults] setObject:sAdvancedSetting_##name forKey:@#capitalizedName]; \
+    [[iTermUserDefaults userDefaults] setObject:sAdvancedSetting_##name forKey:@#capitalizedName]; \
 }
 
 #if ITERM2_SHARED_ARC
@@ -721,6 +722,7 @@ DEFINE_BOOL(noSyncSuppressSendSignal, NO, SECTION_WARNINGS @"Suppress warning ab
 DEFINE_BOOL(noSyncConfirmRemoveAnnotation, NO, SECTION_WARNINGS @"Suppress confirmation to remove annotation?");
 DEFINE_SETTABLE_BOOL(noSyncDisableOpenURL, NoSyncDisableOpenURL, NO, SECTION_WARNINGS @"Disable control sequence to open URLs?");
 DEFINE_SETTABLE_BOOL(noSyncOpenLinksInApp, NoSyncOpenLinksInApp, NO, SECTION_WARNINGS @"Open links using the in-app browser?");
+DEFINE_SETTABLE_BOOL(noSyncBrowserUpsell, NoSyncBrowserUpsell, NO, SECTION_WARNINGS @"Suppress the browser plugin upsell when clicking links?");
 
 #pragma mark Pasteboard
 
@@ -792,7 +794,7 @@ DEFINE_STRING(fontsForGenerousRounding, @"consolas", SECTION_EXPERIMENTAL @"List
 // Experimental features that are mostly dead:
 // This causes problems like issue 6052, where repeats cause the IME to swallow subsequent keypresses.
 DEFINE_BOOL(experimentalKeyHandling, NO, SECTION_EXPERIMENTAL @"Improved support for input method editors like AquaSKK.");
-DEFINE_BOOL(allowSendingFunctionKeysToCocoa, NO, SECTION_EXPERIMENTAL @"Allow function keys to be handled by macOS text input system.\nThis supports using function keys with modifiers as compose/dead keys in custom keyboard layouts.");
+DEFINE_BOOL(allowSendingFunctionKeysToCocoa, YES_IF_BETA_ELSE_NO, SECTION_EXPERIMENTAL @"Allow function keys to be handled by macOS text input system.\nThis supports using function keys with modifiers as compose/dead keys in custom keyboard layouts.");
 // This is just a bad idea because of the latency it adds. It was also maybe related to crashes, but I never did figure it out.
 DEFINE_BOOL(disableMetalWhenIdle, NO, SECTION_EXPERIMENTAL @"Disable metal renderer when idle to save CPU utilization?\nRequires Metal renderer");
 // This never proved itself.

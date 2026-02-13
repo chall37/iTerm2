@@ -131,6 +131,10 @@ class AITermController {
         return llmProvider?.supportsStreaming ?? false
     }
 
+    var supportsPreviousResponseID: Bool {
+        return llmProvider?.supportsPreviousResponseID ?? false
+    }
+
     func request(query: String, stream: Bool = false) {
         state = .initialized(query: .completion(query), stream: stream)
         handle(event: .begin)
@@ -831,7 +835,7 @@ class AITermController {
     }
 
     private func doFunctionCall(_ message: Message, call functionCall: LLM.FunctionCall) {
-        guard let llmProvider else {
+        guard llmProvider != nil else {
             handle(event: .error(AIError("No AI model configured in settings.")))
             return
         }
@@ -840,7 +844,8 @@ class AITermController {
                 .uploadingFile, .addingFileToVectorStore:
             DLog("Unexpected function call in state \(state)")
             return
-        case .querySent(let messages, _):
+        case .querySent(let messages, let streamParserState):
+            let shouldStream = streamParserState != nil
             var amended = messages
             amended.append(message)
             if let impl = functions.first(where: { $0.decl.name == functionCall.name }) {
@@ -861,14 +866,11 @@ class AITermController {
                                                name: functionCall.name,
                                                functionCallID: message.functionCallID))
                         DLog("Set state to querySent with accumulting message:\n\(message)")
-                        state = .querySent(
-                            messages: amended,
-                            streamParserState: StreamParserState(message: message, buffer: Data()))
                         if let truncate {
                             amended = truncate(amended)
                         }
-                        DLog("Will send request with function call output")
-                        request(messages: amended, stream: llmProvider.supportsStreaming)
+                        DLog("Will send request with function call output, stream=\(shouldStream)")
+                        request(messages: amended, stream: shouldStream)
                         return
                     case .failure(let error):
                         DLog("Trouble invoking a ChatGPT function: \(error.localizedDescription)")
@@ -880,7 +882,7 @@ class AITermController {
             }
             amended.append(Message(role: .user,
                                    content: "There is no registered function by that name. Try again."))
-            request(messages: amended, stream: llmProvider.supportsStreaming)
+            request(messages: amended, stream: shouldStream)
         }
     }
 }

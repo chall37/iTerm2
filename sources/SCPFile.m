@@ -7,6 +7,7 @@
 //
 
 #import "SCPFile.h"
+#import "iTermUserDefaults.h"
 #import <NMSSH/NMSSH.h>
 #import <NMSSH/NMSSHConfig.h>
 #import <NMSSH/NMSSHHostConfig.h>
@@ -14,15 +15,15 @@
 
 #import "DebugLogging.h"
 #import "ITAddressBookMgr.h"
-#import "iTermSlowOperationGateway.h"
-#import "iTermOpenDirectory.h"
-#import "iTermSSHHelpers.h"
-#import "iTermWarning.h"
 #import "NSFileManager+iTerm.h"
 #import "NSObject+iTerm.h"
 #import "NSStringITerm.h"
 #import "NSWorkspace+iTerm.h"
 #import "ProfileModel.h"
+#import "iTermOpenDirectory.h"
+#import "iTermSSHHelpers.h"
+#import "iTermSlowOperationGateway.h"
+#import "iTermWarning.h"
 
 @interface NMSSHSession(iTerm)
 @property (atomic, readonly) void *agent;
@@ -231,13 +232,70 @@ static NSError *SCPFileError(NSString *description) {
         NSString *privateKey = [NSString stringWithContentsOfFile:filename
                                                          encoding:NSUTF8StringEncoding
                                                             error:nil];
-        for (NSString *string in @[@"-----BEGIN OPENSSH PRIVATE KEY-----", @"ENCRYPTED"]) {
-            if ([privateKey rangeOfString:string].location != NSNotFound) {
-                return YES;
-            }
+        if (!privateKey) {
+            return NO;  // Can't read file; auth will fail anyway
         }
+
+        // Traditional PEM format: check for ENCRYPTED header
+        if ([privateKey rangeOfString:@"ENCRYPTED"].location != NSNotFound) {
+            return YES;
+        }
+
+        // OpenSSH new format: parse the cipher field
+        NSString *beginMarker = @"-----BEGIN OPENSSH PRIVATE KEY-----";
+        NSString *endMarker = @"-----END OPENSSH PRIVATE KEY-----";
+        NSRange beginRange = [privateKey rangeOfString:beginMarker];
+        if (beginRange.location == NSNotFound) {
+            return NO;  // Unknown format, assume unencrypted
+        }
+
+        NSRange endRange = [privateKey rangeOfString:endMarker];
+        if (endRange.location == NSNotFound) {
+            return NO;
+        }
+
+        // Extract and decode base64 content
+        NSUInteger start = NSMaxRange(beginRange);
+        NSString *b64 = [privateKey substringWithRange:NSMakeRange(start, endRange.location - start)];
+        b64 = [[b64 componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]
+               componentsJoinedByString:@""];
+
+        NSData *decoded = [[NSData alloc] initWithBase64EncodedString:b64 options:0];
+        if (!decoded || decoded.length < 20) {
+            return NO;
+        }
+
+        const char *bytes = decoded.bytes;
+
+        // Verify AUTH_MAGIC: "openssh-key-v1" + null byte (15 bytes total)
+        if (strncmp(bytes, "openssh-key-v1", 14) != 0 || bytes[14] != '\0') {
+            return NO;
+        }
+
+        // Read cipher name (length-prefixed string at offset 15)
+        NSUInteger offset = 15;
+        if (offset + 4 > decoded.length) {
+            return NO;
+        }
+
+        // Length is 4 bytes big-endian
+        uint32_t cipherLen = ((uint32_t)(uint8_t)bytes[offset] << 24) |
+                             ((uint32_t)(uint8_t)bytes[offset + 1] << 16) |
+                             ((uint32_t)(uint8_t)bytes[offset + 2] << 8) |
+                             ((uint32_t)(uint8_t)bytes[offset + 3]);
+        offset += 4;
+
+        if (offset + cipherLen > decoded.length) {
+            return NO;
+        }
+
+        // If cipher is "none", key is unencrypted
+        if (cipherLen == 4 && strncmp(bytes + offset, "none", 4) == 0) {
+            return NO;
+        }
+
+        return YES;  // Encrypted with some cipher
     }
-    return NO;
 }
 
 
@@ -436,30 +494,55 @@ static NSError *SCPFileError(NSString *description) {
                         XLog(@"No key file at %@", keyPath);
                         continue;
                     }
+                    const BOOL keyIsEncrypted = [self privateKeyIsEncrypted:keyPath];
                     NSString *password = nil;
-                    if ([self privateKeyIsEncrypted:keyPath]) {
-                        NSString *prompt = [NSString stringWithFormat:@"passphrase for private key “%@”:",
-                                            keyPath];
-                        password = [self keyboardInteractiveRequest:prompt];
-                    }
-                    XLog(@"Attempting to authenticate with key %@", keyPath);
-                    NSString *publicKeyPath = [keyPath stringByAppendingString:@".pub"];
-                    if (![[NSFileManager defaultManager] fileExistsAtPath:publicKeyPath]) {
-                        XLog(@"Warning: no public key at %@. Trying to authenticate with only a private key.", publicKeyPath);
-                        publicKeyPath = nil;
-                    }
-                    [self.session authenticateByPublicKey:publicKeyPath
-                                               privateKey:keyPath
-                                              andPassword:password];
+                    BOOL firstAttempt = YES;
 
-                    if (self.session.isAuthorized) {
-                        XLog(@"Authorized!");
-                        break;
-                    }
+                    // Loop to allow retry on wrong passphrase
+                    while (!self.stopped && self.session.session) {
+                        if (keyIsEncrypted) {
+                            NSString *prompt;
+                            if (firstAttempt) {
+                                prompt = [NSString stringWithFormat:@"passphrase for private key “%@”:",
+                                          keyPath];
+                            } else {
+                                prompt = [NSString stringWithFormat:@"correct passphrase for “%@”:",
+                                          keyPath];
+                            }
+                            password = [self keyboardInteractiveRequest:prompt];
+                            if (!password) {
+                                self.stopped = YES;
+                                break;
+                            }
+                            firstAttempt = NO;
+                        }
 
-                    if (!self.session.session) {
-                        XLog(@"Disconnected!");
-                        break;
+                        XLog(@"Attempting to authenticate with key %@", keyPath);
+                        NSString *publicKeyPath = [keyPath stringByAppendingString:@".pub"];
+                        if (![[NSFileManager defaultManager] fileExistsAtPath:publicKeyPath]) {
+                            XLog(@"Warning: no public key at %@. Trying to authenticate with only a private key.", publicKeyPath);
+                            publicKeyPath = nil;
+                        }
+                        [self.session authenticateByPublicKey:publicKeyPath
+                                                   privateKey:keyPath
+                                                  andPassword:password];
+
+                        if (self.session.isAuthorized) {
+                            XLog(@"Authorized!");
+                            break;
+                        }
+
+                        if (!self.session.session) {
+                            XLog(@"Disconnected!");
+                            break;
+                        }
+
+                        // If key is not encrypted, don't retry - the key itself wasn't accepted
+                        if (!keyIsEncrypted) {
+                            break;
+                        }
+                        // For encrypted keys, loop back to ask for passphrase again
+                        XLog(@"Wrong passphrase for %@, prompting again", keyPath);
                     }
                 }
                 if (self.session.isAuthorized) {
@@ -712,7 +795,7 @@ static NSString *const SCPFileKnownHostsUserDefaultsKey = @"NoSyncKnownHosts";
 }
 
 - (BOOL)hostnameIsKnown {
-    return [[[NSUserDefaults standardUserDefaults] objectForKey:SCPFileKnownHostsUserDefaultsKey] containsObject:self.userHostPort];
+    return [[[iTermUserDefaults userDefaults] objectForKey:SCPFileKnownHostsUserDefaultsKey] containsObject:self.userHostPort];
 }
 
 - (BOOL)shouldConnectToNewHostname {
@@ -728,9 +811,9 @@ static NSString *const SCPFileKnownHostsUserDefaultsKey = @"NoSyncKnownHosts";
 }
 
 - (void)addKnownHost {
-    NSArray<NSString *> *hosts = [[NSUserDefaults standardUserDefaults] objectForKey:SCPFileKnownHostsUserDefaultsKey] ?: @[];
+    NSArray<NSString *> *hosts = [[iTermUserDefaults userDefaults] objectForKey:SCPFileKnownHostsUserDefaultsKey] ?: @[];
     hosts = [hosts arrayByAddingObject:self.userHostPort];
-    [[NSUserDefaults standardUserDefaults] setObject:hosts forKey:SCPFileKnownHostsUserDefaultsKey];
+    [[iTermUserDefaults userDefaults] setObject:hosts forKey:SCPFileKnownHostsUserDefaultsKey];
 }
 
 - (void)download {

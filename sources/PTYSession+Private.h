@@ -100,6 +100,8 @@ TriggerDelegate> {
 @property(nonatomic, readonly) id<VT100RemoteHostReading> lastRemoteHost;  // last remote host at time of setting current directory
 @property(nonatomic, strong) iTermSessionDirectoryTracker *directoryTracker;
 @property(nonatomic, retain) NSColor *cursorGuideColor;
+@property(nonatomic, assign) BOOL useActivePaneBorder;
+@property(nonatomic, retain) NSColor *activePaneBorderColor;
 @property(nonatomic, copy) NSString *badgeFormat;
 
 // Info about what happens when the program is run so it can be restarted after
@@ -113,6 +115,9 @@ TriggerDelegate> {
 @property(nonatomic, retain) iTermPasteHelper *pasteHelper;
 @property(nonatomic, copy) NSString *lastCommand;
 @property(nonatomic, retain) iTermExpectation *pasteBracketingOopsieExpectation;
+// Reference count for pending bracketed paste first-chunk writes. When > 0,
+// subsequent writes are queued in _dataQueue to prevent out-of-order delivery.
+@property(nonatomic, assign) NSInteger bracketedPastePending;
 @property(nonatomic, copy) NSString *cookie;
 @property(nonatomic, strong) NSDate *lastNonFocusReportingWrite;
 @property(nonatomic, strong) NSDate *lastFocusReportDate;
@@ -122,5 +127,7 @@ TriggerDelegate> {
                identifier:(NSString *)identifier;
 - (void)removeAnnouncementWithIdentifier:(NSString *)identifier;
 - (BOOL)haveAutoComposer;
+- (void)sendDataQueue;
+- (void)bracketedPasteDidExpect;
 
 @end

@@ -10,6 +10,7 @@ import Foundation
 /// Protocol for objects that can provide an SSH identity.
 /// Conductor conforms to this protocol.
 @objc(iTermSSHIdentityProvider)
+@MainActor
 protocol SSHIdentityProvider: AnyObject {
     var sshIdentity: SSHIdentity { get }
 }
@@ -363,6 +364,16 @@ class iTermSessionDirectoryTracker: NSObject {
     @objc
     func poll() {
         pwdPoller.poll()
+    }
+
+    /// Poll for the local working directory and update lastLocalDirectory only.
+    /// Does not affect lastDirectory, shell history, or path variable.
+    /// Used when OSC 7/shell integration is providing directory updates but we still
+    /// want to track the local directory for session restoration.
+    @objc
+    func pollLocalDirectoryOnly() {
+        DLog("\(d(delegate)): pollLocalDirectoryOnly")
+        updateLocalDirectoryWithCompletion { _ in }
     }
 
     /// Called when a line feed is received.

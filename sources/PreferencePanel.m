@@ -69,10 +69,30 @@
 #import "PreferencePanel.h"
 #import "SFSymbolEnum/SFSymbolEnum.h"
 
-#import "DebugLogging.h"
 #import "AppearancePreferencesViewController.h"
+#import "DebugLogging.h"
 #import "GeneralPreferencesViewController.h"
 #import "ITAddressBookMgr.h"
+#import "KeysPreferencesViewController.h"
+#import "NSAppearance+iTerm.h"
+#import "NSArray+iTerm.h"
+#import "NSDictionary+iTerm.h"
+#import "NSFileManager+iTerm.h"
+#import "NSImage+iTerm.h"
+#import "NSNumber+iTerm.h"
+#import "NSPopUpButton+iTerm.h"
+#import "NSStringITerm.h"
+#import "NSView+iTerm.h"
+#import "NSWindow+iTerm.h"
+#import "PTYSession.h"
+#import "PasteboardHistory.h"
+#import "PointerPrefsController.h"
+#import "ProfileModel.h"
+#import "ProfilePreferencesViewController.h"
+#import "ProfilesColorsPreferencesViewController.h"
+#import "PseudoTerminal.h"
+#import "SessionView.h"
+#import "WindowArrangements.h"
 #import "iTerm2SharedARC-Swift.h"
 #import "iTermAdvancedSettingsModel.h"
 #import "iTermAdvancedSettingsViewController.h"
@@ -83,32 +103,13 @@
 #import "iTermLaunchServices.h"
 #import "iTermPreferences.h"
 #import "iTermPreferencesSearch.h"
-#import "iTermRemotePreferences.h"
 #import "iTermPreferencesSearchEngineResultsWindowController.h"
+#import "iTermRemotePreferences.h"
 #import "iTermSearchableViewController.h"
 #import "iTermShortcutsViewController.h"
 #import "iTermSizeRememberingView.h"
+#import "iTermUserDefaults.h"
 #import "iTermWarning.h"
-#import "KeysPreferencesViewController.h"
-#import "NSArray+iTerm.h"
-#import "NSAppearance+iTerm.h"
-#import "NSDictionary+iTerm.h"
-#import "NSFileManager+iTerm.h"
-#import "NSImage+iTerm.h"
-#import "NSNumber+iTerm.h"
-#import "NSPopUpButton+iTerm.h"
-#import "NSStringITerm.h"
-#import "NSView+iTerm.h"
-#import "NSWindow+iTerm.h"
-#import "PasteboardHistory.h"
-#import "PointerPrefsController.h"
-#import "ProfileModel.h"
-#import "ProfilePreferencesViewController.h"
-#import "ProfilesColorsPreferencesViewController.h"
-#import "PseudoTerminal.h"
-#import "PTYSession.h"
-#import "SessionView.h"
-#import "WindowArrangements.h"
 #include <stdlib.h>
 
 NSString *const kRefreshTerminalNotification = @"kRefreshTerminalNotification";
@@ -233,6 +234,57 @@ static PreferencePanel *gSessionsPreferencePanel;
 
 @end
 
+// Workaround for macOS 26 bug where text in NSSearchToolbarItem's search field
+// is not vertically centered. Issue 12708.
+@interface iTermPrefsSearchFieldCell : NSSearchFieldCell
+@end
+
+@implementation iTermPrefsSearchFieldCell
+
+- (NSRect)searchTextRectForBounds:(NSRect)rect {
+    NSRect result = [super searchTextRectForBounds:rect];
+    // Adjust vertical position to center the text properly on Tahoe
+    result.origin.y -= 2;
+    return result;
+}
+
+- (NSRect)searchButtonRectForBounds:(NSRect)rect {
+    NSRect result = [super searchButtonRectForBounds:rect];
+    result.origin.y -= 2;
+    return result;
+}
+
+- (NSRect)cancelButtonRectForBounds:(NSRect)rect {
+    NSRect result = [super cancelButtonRectForBounds:rect];
+    result.origin.y -= 2;
+    return result;
+}
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    [super drawWithFrame:cellFrame inView:controlView];
+
+    // Draw custom focus ring that extends beyond cell bounds
+    if ([controlView respondsToSelector:@selector(currentEditor)] &&
+        [(NSControl *)controlView currentEditor] != nil) {
+        [NSGraphicsContext saveGraphicsState];
+
+        // Extend frame by 4 points on top and bottom
+        NSRect focusFrame = NSInsetRect(cellFrame, -0.5, -4);
+
+        // Use system accent color for focus ring
+        NSColor *focusColor = [NSColor keyboardFocusIndicatorColor];
+        [focusColor setStroke];
+
+        NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:focusFrame xRadius:16 yRadius:16];
+        path.lineWidth = 3.0;
+        [path stroke];
+
+        [NSGraphicsContext restoreGraphicsState];
+    }
+}
+
+@end
+
 @interface iTermPrefsFieldEditor: NSTextView
 @end
 
@@ -351,17 +403,17 @@ static PreferencePanel *gSessionsPreferencePanel;
 }
 
 - (BOOL)setFrameUsingName:(NSWindowFrameAutosaveName)name force:(BOOL)force {
-    NSDictionary *dict = [[NSUserDefaults standardUserDefaults] objectForKey:[self userDefaultsKeyForFrameName:name]];
+    NSDictionary *dict = [[iTermUserDefaults userDefaults] objectForKey:[self userDefaultsKeyForFrameName:name]];
     return [self setFrameFromDict:dict];
 }
 
 - (void)saveFrameUsingName:(NSWindowFrameAutosaveName)name {
-    [[NSUserDefaults standardUserDefaults] setObject:[self dictForFrame:self.frame onScreen:self.screen]
+    [[iTermUserDefaults userDefaults] setObject:[self dictForFrame:self.frame onScreen:self.screen]
                                               forKey:[self userDefaultsKeyForFrameName:name]];
 }
 
 - (BOOL)haveSavedFrameForFrameWithName:(NSString *)name {
-    return [[NSUserDefaults standardUserDefaults] objectForKey:[self userDefaultsKeyForFrameName:name]] != nil;
+    return [[iTermUserDefaults userDefaults] objectForKey:[self userDefaultsKeyForFrameName:name]] != nil;
 }
 
 - (BOOL)setFrameFromDict:(NSDictionary *)dict {
@@ -838,7 +890,7 @@ andEditComponentWithIdentifier:(NSString *)identifier
     }
 
     [strongSelf postWillCloseNotification];
-    [[NSUserDefaults standardUserDefaults] synchronize];
+    [[iTermUserDefaults userDefaults] synchronize];
 }
 
 - (void)windowDidBecomeKey:(NSNotification *)aNotification {
@@ -929,6 +981,25 @@ andEditComponentWithIdentifier:(NSString *)identifier
         _bigSurSearchFieldToolbarItem = [[NSSearchToolbarItem alloc] initWithItemIdentifier:iTermPreferencePanelSearchFieldToolbarItemIdentifier];
         _bigSurSearchFieldToolbarItem.label = @"";
         _bigSurSearchFieldToolbarItem.searchField.delegate = self;
+
+        // Workaround for macOS 26 bug where text is not vertically centered. Issue 12708.
+        if (@available(macOS 27, *)) {
+            // Presumably fixed in macOS 27.
+        } else if (@available(macOS 26, *)) {
+            // Copy the existing cell and replace it with our subclass that fixes vertical alignment.
+            NSSearchFieldCell *originalCell = _bigSurSearchFieldToolbarItem.searchField.cell;
+            NSData *archivedCell = [NSKeyedArchiver archivedDataWithRootObject:originalCell
+                                                         requiringSecureCoding:NO
+                                                                         error:nil];
+            NSKeyedUnarchiver *unarchiver = [[NSKeyedUnarchiver alloc] initForReadingFromData:archivedCell error:nil];
+            unarchiver.requiresSecureCoding = NO;
+            [unarchiver setClass:[iTermPrefsSearchFieldCell class] forClassName:NSStringFromClass([NSSearchFieldCell class])];
+            NSSearchFieldCell *newCell = [unarchiver decodeObjectForKey:NSKeyedArchiveRootObjectKey];
+            _bigSurSearchFieldToolbarItem.searchField.cell = newCell;
+
+            // Disable system focus ring - we'll draw our own in the cell
+            _bigSurSearchFieldToolbarItem.searchField.focusRingType = NSFocusRingTypeNone;
+        }
 
         NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Search Options"];
         NSMenuItem *menuItem = [[NSMenuItem alloc] initWithTitle:@"Show indicators for non-default values"

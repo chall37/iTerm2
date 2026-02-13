@@ -7,16 +7,12 @@
 //
 
 #import "iTermProfilePreferences.h"
+#import "iTermUserDefaults.h"
 
 #define ENABLE_DEPRECATED_ADVANCED_SETTINGS
 
 #import "DebugLogging.h"
 #import "ITAddressBookMgr.h"
-#import "iTermAdvancedSettingsModel.h"
-#import "iTermCursor.h"
-#import "iTermPreferences.h"
-#import "iTermScriptHistory.h"
-#import "iTermStatusBarLayout.h"
 #import "NSArray+iTerm.h"
 #import "NSColor+iTerm.h"
 #import "NSDictionary+iTerm.h"
@@ -24,6 +20,11 @@
 #import "NSJSONSerialization+iTerm.h"
 #import "PreferencePanel.h"
 #import "Trigger.h"
+#import "iTermAdvancedSettingsModel.h"
+#import "iTermCursor.h"
+#import "iTermPreferences.h"
+#import "iTermScriptHistory.h"
+#import "iTermStatusBarLayout.h"
 
 #define PROFILE_BLOCK(x) [^id(Profile *profile) { return [self x:profile]; } copy]
 
@@ -242,13 +243,13 @@ typedef struct {
 
         NSArray *color = @[ KEY_FOREGROUND_COLOR, KEY_BACKGROUND_COLOR, KEY_BOLD_COLOR,
                             KEY_LINK_COLOR, KEY_MATCH_COLOR, KEY_SELECTION_COLOR, KEY_SELECTED_TEXT_COLOR,
-                            KEY_CURSOR_COLOR, KEY_CURSOR_TEXT_COLOR, KEY_ANSI_0_COLOR,
+                            KEY_CURSOR_COLOR, KEY_CURSOR_TEXT_COLOR, KEY_IME_CURSOR_COLOR, KEY_ANSI_0_COLOR,
                             KEY_ANSI_1_COLOR, KEY_ANSI_2_COLOR, KEY_ANSI_3_COLOR, KEY_ANSI_4_COLOR,
                             KEY_ANSI_5_COLOR, KEY_ANSI_6_COLOR, KEY_ANSI_7_COLOR, KEY_ANSI_8_COLOR,
                             KEY_ANSI_9_COLOR, KEY_ANSI_10_COLOR, KEY_ANSI_11_COLOR, KEY_ANSI_12_COLOR,
                             KEY_ANSI_13_COLOR, KEY_ANSI_14_COLOR, KEY_ANSI_15_COLOR,
                             KEY_CURSOR_GUIDE_COLOR, KEY_BADGE_COLOR, KEY_TAB_COLOR,
-                            KEY_UNDERLINE_COLOR ];
+                            KEY_UNDERLINE_COLOR, KEY_ACTIVE_PANE_BORDER_COLOR ];
         color = [color flatMapWithBlock:^NSArray *(NSString *key) {
             return @[ key,
                       [key stringByAppendingString:COLORS_LIGHT_MODE_SUFFIX],
@@ -271,6 +272,10 @@ typedef struct {
             KEY_USE_UNDERLINE_COLOR COLORS_LIGHT_MODE_SUFFIX,
             KEY_USE_UNDERLINE_COLOR COLORS_DARK_MODE_SUFFIX,
             KEY_USE_UNDERLINE_COLOR,
+
+            KEY_USE_ACTIVE_PANE_BORDER COLORS_LIGHT_MODE_SUFFIX,
+            KEY_USE_ACTIVE_PANE_BORDER COLORS_DARK_MODE_SUFFIX,
+            KEY_USE_ACTIVE_PANE_BORDER,
 
             KEY_SMART_CURSOR_COLOR COLORS_LIGHT_MODE_SUFFIX,
             KEY_SMART_CURSOR_COLOR COLORS_DARK_MODE_SUFFIX,
@@ -319,6 +324,7 @@ typedef struct {
             KEY_APPLICATION_KEYPAD_ALLOWED, KEY_ALLOW_MODIFY_OTHER_KEYS,
             KEY_LEFT_OPTION_KEY_CHANGEABLE, KEY_RIGHT_OPTION_KEY_CHANGEABLE,
             KEY_PLACE_PROMPT_AT_FIRST_COLUMN, KEY_SHOW_MARK_INDICATORS, KEY_SHOW_OFFSCREEN_COMMANDLINE,
+            KEY_SHOW_OFFSCREEN_COMMANDLINE_FOR_CURRENT_COMMAND,
 
             KEY_TMUX_NEWLINE, KEY_PROMPT_PATH_CLICK_OPENS_NAVIGATOR,
             KEY_POWERLINE, KEY_TRIGGERS_USE_INTERPOLATED_STRINGS,
@@ -326,7 +332,7 @@ typedef struct {
             KEY_SMART_SELECTION_ACTIONS_USE_INTERPOLATED_STRINGS,
 
             KEY_AUTOLOG, KEY_ARCHIVE, KEY_HAS_HOTKEY,
-            KEY_HIDE_AFTER_OPENING,
+            KEY_HIDE_AFTER_OPENING, KEY_LOCK_WINDOW_SIZE_AUTOMATICALLY,
             KEY_HOTKEY_AUTOHIDE, KEY_HOTKEY_REOPEN_ON_ACTIVATION, KEY_HOTKEY_ANIMATE,
             KEY_HOTKEY_FLOAT, KEY_OPEN_TOOLBELT, KEY_PREVENT_TAB,
             KEY_HOTKEY_ACTIVATE_WITH_MODIFIER,
@@ -518,6 +524,7 @@ typedef struct {
             KEY_SELECTED_TEXT_COLOR COLORS_LIGHT_MODE_SUFFIX:       @"Text color of selected text in light mode",
             KEY_CURSOR_COLOR COLORS_LIGHT_MODE_SUFFIX:              @"Cursor fill color in light mode",
             KEY_CURSOR_TEXT_COLOR COLORS_LIGHT_MODE_SUFFIX:         @"Color of text under the cursor in light mode",
+            KEY_IME_CURSOR_COLOR COLORS_LIGHT_MODE_SUFFIX:          @"IME composition cursor color in light mode",
             KEY_ANSI_0_COLOR COLORS_LIGHT_MODE_SUFFIX:              @"ANSI black color in light mode",
             KEY_ANSI_1_COLOR COLORS_LIGHT_MODE_SUFFIX:              @"ANSI red color in light mode",
             KEY_ANSI_2_COLOR COLORS_LIGHT_MODE_SUFFIX:              @"ANSI green color in light mode",
@@ -536,6 +543,7 @@ typedef struct {
             KEY_ANSI_15_COLOR COLORS_LIGHT_MODE_SUFFIX:             @"ANSI bright white color in light mode",
             KEY_CURSOR_GUIDE_COLOR COLORS_LIGHT_MODE_SUFFIX:        @"Cursor Guide color in light mode",
             KEY_BADGE_COLOR COLORS_LIGHT_MODE_SUFFIX:               @"Color of the badge overlay in light mode",
+            KEY_ACTIVE_PANE_BORDER_COLOR COLORS_LIGHT_MODE_SUFFIX:  @"Border color for active pane in light mode",
             KEY_FOREGROUND_COLOR COLORS_DARK_MODE_SUFFIX:           @"Default text color in dark mode",
             KEY_BACKGROUND_COLOR COLORS_DARK_MODE_SUFFIX:           @"Terminal background color in dark mode",
             KEY_BOLD_COLOR COLORS_DARK_MODE_SUFFIX:                 @"Color for bold text in dark mode",
@@ -545,6 +553,7 @@ typedef struct {
             KEY_SELECTED_TEXT_COLOR COLORS_DARK_MODE_SUFFIX:        @"Text color of selected text in dark mode",
             KEY_CURSOR_COLOR COLORS_DARK_MODE_SUFFIX:               @"Cursor fill color in dark mode",
             KEY_CURSOR_TEXT_COLOR COLORS_DARK_MODE_SUFFIX:          @"Color of text under the cursor in dark mode",
+            KEY_IME_CURSOR_COLOR COLORS_DARK_MODE_SUFFIX:           @"IME composition cursor color in dark mode",
             KEY_ANSI_0_COLOR COLORS_DARK_MODE_SUFFIX:               @"ANSI black color in dark mode",
             KEY_ANSI_1_COLOR COLORS_DARK_MODE_SUFFIX:               @"ANSI red color in dark mode",
             KEY_ANSI_2_COLOR COLORS_DARK_MODE_SUFFIX:               @"ANSI green color in dark mode",
@@ -563,6 +572,7 @@ typedef struct {
             KEY_ANSI_15_COLOR COLORS_DARK_MODE_SUFFIX:              @"ANSI bright white color in dark mode",
             KEY_CURSOR_GUIDE_COLOR COLORS_DARK_MODE_SUFFIX:         @"Cursor Guide color in dark mode",
             KEY_BADGE_COLOR COLORS_DARK_MODE_SUFFIX:                @"Color of the badge overlay in dark mode",
+            KEY_ACTIVE_PANE_BORDER_COLOR COLORS_DARK_MODE_SUFFIX:   @"Border color for active pane in dark mode",
             KEY_USE_CURSOR_GUIDE COLORS_LIGHT_MODE_SUFFIX:          @"Whether to show the Cursor Guide in light mode",
             KEY_USE_CURSOR_GUIDE COLORS_DARK_MODE_SUFFIX:           @"Whether to show the Cursor Guide in dark mode",
             KEY_TAB_COLOR COLORS_LIGHT_MODE_SUFFIX:                 @"Tab Color in light mode",
@@ -575,6 +585,8 @@ typedef struct {
             KEY_UNDERLINE_COLOR COLORS_DARK_MODE_SUFFIX:            @"Color for underlined text in dark mode",
             KEY_USE_UNDERLINE_COLOR COLORS_LIGHT_MODE_SUFFIX:       @"Whether to use a custom underline color in light mode",
             KEY_USE_UNDERLINE_COLOR COLORS_DARK_MODE_SUFFIX:        @"Whether to use a custom underline color in dark mode",
+            KEY_USE_ACTIVE_PANE_BORDER COLORS_LIGHT_MODE_SUFFIX:    @"Whether to show a border around the active pane in light mode",
+            KEY_USE_ACTIVE_PANE_BORDER COLORS_DARK_MODE_SUFFIX:     @"Whether to show a border around the active pane in dark mode",
             KEY_SMART_CURSOR_COLOR COLORS_LIGHT_MODE_SUFFIX:        @"Whether cursor color is based on underlying text in light mode",
             KEY_SMART_CURSOR_COLOR COLORS_DARK_MODE_SUFFIX:         @"Whether cursor color is based on underlying text in dark mode",
             KEY_MINIMUM_CONTRAST COLORS_LIGHT_MODE_SUFFIX:          @"Minimum contrast ratio between text and background in light mode",
@@ -612,6 +624,7 @@ typedef struct {
             KEY_SELECTED_TEXT_COLOR:                                @"Text color of selected text",
             KEY_CURSOR_COLOR:                                       @"Cursor fill color",
             KEY_CURSOR_TEXT_COLOR:                                  @"Color of text under the cursor",
+            KEY_IME_CURSOR_COLOR:                                   @"IME composition cursor color",
             KEY_ANSI_0_COLOR:                                       @"ANSI black color",
             KEY_ANSI_1_COLOR:                                       @"ANSI red color",
             KEY_ANSI_2_COLOR:                                       @"ANSI green color",
@@ -636,6 +649,8 @@ typedef struct {
             KEY_USE_SELECTED_TEXT_COLOR:                            @"Whether to use a custom color for selected text",
             KEY_UNDERLINE_COLOR:                                    @"Color for underlined text",
             KEY_USE_UNDERLINE_COLOR:                                @"Whether to use a custom underline color",
+            KEY_ACTIVE_PANE_BORDER_COLOR:                           @"Border color for active pane",
+            KEY_USE_ACTIVE_PANE_BORDER:                             @"Whether to show a border around the active pane",
             KEY_SMART_CURSOR_COLOR:                                 @"Whether cursor color is based on underlying text",
             KEY_MINIMUM_CONTRAST:                                   @"Minimum contrast ratio between text and background",
             KEY_FAINT_TEXT_ALPHA:                                   @"Opacity of faint (dim) text",
@@ -669,6 +684,7 @@ typedef struct {
             KEY_COLUMNS:                                            @"Initial number of columns in terminal",
             KEY_ROWS:                                               @"Initial number of rows in terminal",
             KEY_HIDE_AFTER_OPENING:                                 @"Whether to hide window immediately after opening",
+            KEY_LOCK_WINDOW_SIZE_AUTOMATICALLY:                     @"Whether to lock window size immediately after opening",
             KEY_WINDOW_TYPE:                                        @"Window style: normal, fullscreen, maximized, etc.",
             KEY_USE_CUSTOM_WINDOW_TITLE:                            @"Whether to use a custom window title",
             KEY_CUSTOM_WINDOW_TITLE:                                @"Custom window title template",
@@ -752,6 +768,7 @@ typedef struct {
             KEY_SHOW_MARK_INDICATORS:                               @"Whether to show shell integration mark indicators",
             KEY_PROMPT_PATH_CLICK_OPENS_NAVIGATOR:                  @"Whether clicking path in prompt opens file navigator",
             KEY_SHOW_OFFSCREEN_COMMANDLINE:                         @"Whether to show command line when scrolled up",
+            KEY_SHOW_OFFSCREEN_COMMANDLINE_FOR_CURRENT_COMMAND:     @"Whether to show command line over the top of the screen for the running command",
             KEY_TMUX_NEWLINE:                                       @"Whether to send newline instead of carriage return in tmux",
             KEY_HAS_HOTKEY:                                         @"Whether this profile has a dedicated hotkey window",
             KEY_HOTKEY_MODIFIER_FLAGS:                              @"Modifier flags for the hotkey",
@@ -831,6 +848,7 @@ typedef struct {
                   KEY_SELECTED_TEXT_COLOR: [[NSColor colorWithCalibratedRed:0.000 green:0.000 blue:0.000 alpha:1] dictionaryValue],
                   KEY_CURSOR_COLOR:        [[NSColor colorWithCalibratedRed:0.733 green:0.733 blue:0.733 alpha:1] dictionaryValue],
                   KEY_CURSOR_TEXT_COLOR:   [[NSColor colorWithCalibratedRed:1.000 green:1.000 blue:1.000 alpha:1] dictionaryValue],
+                  KEY_IME_CURSOR_COLOR:    [[NSColor colorWithCalibratedRed:1.000 green:1.000 blue:0.000 alpha:1] dictionaryValue],
                   KEY_ANSI_0_COLOR:        [[NSColor colorWithCalibratedRed:0.000 green:0.000 blue:0.000 alpha:1] dictionaryValue],
                   KEY_ANSI_1_COLOR:        [[NSColor colorWithCalibratedRed:0.733 green:0.000 blue:0.000 alpha:1] dictionaryValue],
                   KEY_ANSI_2_COLOR:        [[NSColor colorWithCalibratedRed:0.000 green:0.733 blue:0.000 alpha:1] dictionaryValue],
@@ -849,6 +867,7 @@ typedef struct {
                   KEY_ANSI_15_COLOR:       [[NSColor colorWithCalibratedRed:1.000 green:1.000 blue:1.000 alpha:1] dictionaryValue],
                   KEY_CURSOR_GUIDE_COLOR:  [[NSColor colorWithCalibratedRed:0.650 green:0.910 blue:1.000 alpha:0.25] dictionaryValue],
                   KEY_BADGE_COLOR:         [[NSColor colorWithCalibratedRed:1.0 green:0.000 blue:0.000 alpha:0.5] dictionaryValue],
+                  KEY_ACTIVE_PANE_BORDER_COLOR: [[NSColor colorWithCalibratedRed:0.0 green:0.5 blue:1.0 alpha:1.0] dictionaryValue],
 
                   // The light and dark variants are used.
                   KEY_FOREGROUND_COLOR COLORS_LIGHT_MODE_SUFFIX:    [[NSColor colorWithCalibratedRed:0.733 green:0.733 blue:0.733 alpha:1] dictionaryValue],
@@ -860,6 +879,7 @@ typedef struct {
                   KEY_SELECTED_TEXT_COLOR COLORS_LIGHT_MODE_SUFFIX: [[NSColor colorWithCalibratedRed:0.000 green:0.000 blue:0.000 alpha:1] dictionaryValue],
                   KEY_CURSOR_COLOR COLORS_LIGHT_MODE_SUFFIX:        [[NSColor colorWithCalibratedRed:0.733 green:0.733 blue:0.733 alpha:1] dictionaryValue],
                   KEY_CURSOR_TEXT_COLOR COLORS_LIGHT_MODE_SUFFIX:   [[NSColor colorWithCalibratedRed:1.000 green:1.000 blue:1.000 alpha:1] dictionaryValue],
+                  KEY_IME_CURSOR_COLOR COLORS_LIGHT_MODE_SUFFIX:    [[NSColor colorWithCalibratedRed:1.000 green:1.000 blue:0.000 alpha:1] dictionaryValue],
                   KEY_ANSI_0_COLOR COLORS_LIGHT_MODE_SUFFIX:        [[NSColor colorWithCalibratedRed:0.000 green:0.000 blue:0.000 alpha:1] dictionaryValue],
                   KEY_ANSI_1_COLOR COLORS_LIGHT_MODE_SUFFIX:        [[NSColor colorWithCalibratedRed:0.733 green:0.000 blue:0.000 alpha:1] dictionaryValue],
                   KEY_ANSI_2_COLOR COLORS_LIGHT_MODE_SUFFIX:        [[NSColor colorWithCalibratedRed:0.000 green:0.733 blue:0.000 alpha:1] dictionaryValue],
@@ -878,6 +898,7 @@ typedef struct {
                   KEY_ANSI_15_COLOR COLORS_LIGHT_MODE_SUFFIX:       [[NSColor colorWithCalibratedRed:1.000 green:1.000 blue:1.000 alpha:1] dictionaryValue],
                   KEY_CURSOR_GUIDE_COLOR COLORS_LIGHT_MODE_SUFFIX:  [[NSColor colorWithCalibratedRed:0.650 green:0.910 blue:1.000 alpha:0.25] dictionaryValue],
                   KEY_BADGE_COLOR COLORS_LIGHT_MODE_SUFFIX:         [[NSColor colorWithCalibratedRed:1.0 green:0.000 blue:0.000 alpha:0.5] dictionaryValue],
+                  KEY_ACTIVE_PANE_BORDER_COLOR COLORS_LIGHT_MODE_SUFFIX: [[NSColor colorWithCalibratedRed:0.0 green:0.5 blue:1.0 alpha:1.0] dictionaryValue],
 
                   KEY_FOREGROUND_COLOR COLORS_DARK_MODE_SUFFIX:    [[NSColor colorWithCalibratedRed:0.733 green:0.733 blue:0.733 alpha:1] dictionaryValue],
                   KEY_BACKGROUND_COLOR COLORS_DARK_MODE_SUFFIX:    [[NSColor colorWithCalibratedRed:0.000 green:0.000 blue:0.000 alpha:1] dictionaryValue],
@@ -888,6 +909,7 @@ typedef struct {
                   KEY_SELECTED_TEXT_COLOR COLORS_DARK_MODE_SUFFIX: [[NSColor colorWithCalibratedRed:0.000 green:0.000 blue:0.000 alpha:1] dictionaryValue],
                   KEY_CURSOR_COLOR COLORS_DARK_MODE_SUFFIX:        [[NSColor colorWithCalibratedRed:0.733 green:0.733 blue:0.733 alpha:1] dictionaryValue],
                   KEY_CURSOR_TEXT_COLOR COLORS_DARK_MODE_SUFFIX:   [[NSColor colorWithCalibratedRed:1.000 green:1.000 blue:1.000 alpha:1] dictionaryValue],
+                  KEY_IME_CURSOR_COLOR COLORS_DARK_MODE_SUFFIX:    [[NSColor colorWithCalibratedRed:1.000 green:1.000 blue:0.000 alpha:1] dictionaryValue],
                   KEY_ANSI_0_COLOR COLORS_DARK_MODE_SUFFIX:        [[NSColor colorWithCalibratedRed:0.000 green:0.000 blue:0.000 alpha:1] dictionaryValue],
                   KEY_ANSI_1_COLOR COLORS_DARK_MODE_SUFFIX:        [[NSColor colorWithCalibratedRed:0.733 green:0.000 blue:0.000 alpha:1] dictionaryValue],
                   KEY_ANSI_2_COLOR COLORS_DARK_MODE_SUFFIX:        [[NSColor colorWithCalibratedRed:0.000 green:0.733 blue:0.000 alpha:1] dictionaryValue],
@@ -906,6 +928,7 @@ typedef struct {
                   KEY_ANSI_15_COLOR COLORS_DARK_MODE_SUFFIX:       [[NSColor colorWithCalibratedRed:1.000 green:1.000 blue:1.000 alpha:1] dictionaryValue],
                   KEY_CURSOR_GUIDE_COLOR COLORS_DARK_MODE_SUFFIX:  [[NSColor colorWithCalibratedRed:0.650 green:0.910 blue:1.000 alpha:0.25] dictionaryValue],
                   KEY_BADGE_COLOR COLORS_DARK_MODE_SUFFIX:         [[NSColor colorWithCalibratedRed:1.0 green:0.000 blue:0.000 alpha:0.5] dictionaryValue],
+                  KEY_ACTIVE_PANE_BORDER_COLOR COLORS_DARK_MODE_SUFFIX: [[NSColor colorWithCalibratedRed:0.0 green:0.5 blue:1.0 alpha:1.0] dictionaryValue],
 
 
                   KEY_USE_CURSOR_GUIDE: @NO,
@@ -931,6 +954,10 @@ typedef struct {
                   KEY_USE_UNDERLINE_COLOR: @NO,
                   KEY_USE_UNDERLINE_COLOR COLORS_LIGHT_MODE_SUFFIX: @NO,
                   KEY_USE_UNDERLINE_COLOR COLORS_DARK_MODE_SUFFIX: @NO,
+
+                  KEY_USE_ACTIVE_PANE_BORDER: @NO,
+                  KEY_USE_ACTIVE_PANE_BORDER COLORS_LIGHT_MODE_SUFFIX: @NO,
+                  KEY_USE_ACTIVE_PANE_BORDER COLORS_DARK_MODE_SUFFIX: @NO,
 
                   KEY_SMART_CURSOR_COLOR: @NO,
                   KEY_SMART_CURSOR_COLOR COLORS_LIGHT_MODE_SUFFIX: @NO,
@@ -986,6 +1013,7 @@ typedef struct {
                   KEY_WIDTH_PERCENTAGE: @100,
                   KEY_HEIGHT_PERCENTAGE: @100,
                   KEY_HIDE_AFTER_OPENING: @NO,
+                  KEY_LOCK_WINDOW_SIZE_AUTOMATICALLY: @NO,
                   KEY_WINDOW_TYPE: @(WINDOW_TYPE_NORMAL),
                   KEY_USE_CUSTOM_WINDOW_TITLE: @NO,
                   KEY_CUSTOM_WINDOW_TITLE: @"",
@@ -1069,6 +1097,7 @@ typedef struct {
                   KEY_SHOW_MARK_INDICATORS: @YES,
                   KEY_PROMPT_PATH_CLICK_OPENS_NAVIGATOR: @NO,
                   KEY_SHOW_OFFSCREEN_COMMANDLINE: @YES,
+                  KEY_SHOW_OFFSCREEN_COMMANDLINE_FOR_CURRENT_COMMAND: @NO,
                   KEY_TMUX_NEWLINE: @NO,
                   KEY_HAS_HOTKEY: @NO,
                   KEY_HOTKEY_MODIFIER_FLAGS: @0,
@@ -1103,7 +1132,7 @@ typedef struct {
                   KEY_OPEN_PASSWORD_MANAGER_AUTOMATICALLY: @NO,
                   KEY_TIMESTAMPS_STYLE: @(iTermTimestampsModeOverlap),
                   // Migration path for former advanced setting
-                  KEY_TIMESTAMPS_VISIBLE: [[NSUserDefaults standardUserDefaults] objectForKey:@"ShowTimestampsByDefault"] ?: @NO,
+                  KEY_TIMESTAMPS_VISIBLE: [[iTermUserDefaults userDefaults] objectForKey:@"ShowTimestampsByDefault"] ?: @NO,
                   KEY_USE_SEPARATE_COLORS_FOR_LIGHT_AND_DARK_MODE: @NO,
                   KEY_SNIPPETS_FILTER: @[],
 
@@ -1307,7 +1336,7 @@ typedef struct {
     }
 
     // If the user set a preference with the now-removed advanced setting, use it.
-    NSNumber *legacyDefault = [[NSUserDefaults standardUserDefaults] objectForKey:@"AntiIdleTimerPeriod"];
+    NSNumber *legacyDefault = [[iTermUserDefaults userDefaults] objectForKey:@"AntiIdleTimerPeriod"];
     if (legacyDefault) {
         return legacyDefault;
     }
@@ -1474,7 +1503,7 @@ typedef struct {
     }
 
     // If there was an old setting in advanced prefs, use that. Fall back to the default value.
-    NSNumber *number = [NSNumber castFrom:[[NSUserDefaults standardUserDefaults] objectForKey:@"OptionIsMetaForSpecialChars"]];
+    NSNumber *number = [NSNumber castFrom:[[iTermUserDefaults userDefaults] objectForKey:@"OptionIsMetaForSpecialChars"]];
     if (number){
         return @(!number.boolValue);
     }
@@ -1537,9 +1566,9 @@ typedef struct {
     }
 
     // Respect any existing now-deprecated settings.
-    NSNumber *stickyNumber = [[NSUserDefaults standardUserDefaults] objectForKey:KEY_SYNC_TITLE_DEPRECATED];
-    NSNumber *showJobNumber = [[NSUserDefaults standardUserDefaults] objectForKey:kPreferenceKeyShowJobName_Deprecated];
-    NSNumber *showProfileNameNumber = [[NSUserDefaults standardUserDefaults] objectForKey:kPreferenceKeyShowProfileName_Deprecated];
+    NSNumber *stickyNumber = [[iTermUserDefaults userDefaults] objectForKey:KEY_SYNC_TITLE_DEPRECATED];
+    NSNumber *showJobNumber = [[iTermUserDefaults userDefaults] objectForKey:kPreferenceKeyShowJobName_Deprecated];
+    NSNumber *showProfileNameNumber = [[iTermUserDefaults userDefaults] objectForKey:kPreferenceKeyShowProfileName_Deprecated];
 
     if (!stickyNumber && !showJobNumber && !showProfileNameNumber) {
         // No deprecated settings; use the modern default.

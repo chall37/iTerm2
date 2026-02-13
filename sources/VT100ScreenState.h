@@ -156,6 +156,11 @@ extern NSString *const kScreenStateProgressKey;
 // Did we get FinalTerm codes that report info about prompt? Used to decide if advanced paste
 // can wait for prompts.
 @property (nonatomic, readonly) BOOL shouldExpectPromptMarks;
+
+// Did we get OSC 7 or shell integration working directory updates? Used to prevent window title
+// triggered directory polling from overriding shell-provided directories.
+@property (nonatomic, readonly) BOOL shouldExpectWorkingDirectoryUpdates;
+
 @property (nonatomic, readonly) BOOL echoProbeIsActive;
 
 // From VT100Terminal - no mutable equivalents provided.
@@ -240,6 +245,7 @@ extern NSString *const kScreenStateProgressKey;
 @property (nonatomic, readwrite) long long fakePromptDetectedAbsLine;
 @property (nonatomic, readwrite) long long lastPromptLine;
 @property (nonatomic, readwrite) BOOL shouldExpectPromptMarks;
+@property (nonatomic, readwrite) BOOL shouldExpectWorkingDirectoryUpdates;
 @property (nonatomic, copy, readwrite) id<VT100ScreenConfiguration> config;
 @property (nullable, nonatomic, strong, readwrite) NSArray<iTermTuple<NSString *, NSString *> *> *exfiltratedEnvironment;
 @property (nonatomic, readwrite, copy) NSMutableDictionary<NSString *, NSNumber *> *blockStartAbsLine;
@@ -331,6 +337,8 @@ extern NSString *const kScreenStateProgressKey;
 @property (nonatomic, readonly) id<VT100RemoteHostReading> lastRemoteHost;
 @property (nonatomic, readonly) id<VT100ScreenMarkReading> lastPromptMark;
 @property (nonatomic, readonly) id<VT100ScreenMarkReading> firstPromptMark;
+@property (nonatomic, readonly) id<VT100ScreenMarkReading> firstScreenMark;
+@property (nonatomic, readonly) id<VT100ScreenMarkReading> lastScreenMark;
 
 // If at a shell prompt, this gives the range of the command being edited not past the cursor.
 // If not at a prompt (no shell integration or command is running) this is -1,-1,-1,-1.
@@ -348,8 +356,9 @@ extern NSString *const kScreenStateProgressKey;
                                       mustHaveCommand:(BOOL)mustHaveCommand
                                                 range:(out VT100GridWindowedRange * _Nullable)rangeOut;
 - (id<VT100ScreenMarkReading> _Nullable)commandMarkAtOrBeforeLine:(int)line;
-- (id<VT100ScreenMarkReading> _Nullable)promptMarkAfterPromptMark:(id<VT100ScreenMarkReading>)predecessor;
-- (id<VT100ScreenMarkReading> _Nullable)promptMarkBeforePromptMark:(id<VT100ScreenMarkReading>)successor;
+- (id<VT100ScreenMarkReading> _Nullable)promptMarkAfterScreenMark:(id<VT100ScreenMarkReading>)predecessor;
+- (id<VT100ScreenMarkReading> _Nullable)screenMarkAfterScreenMark:(id<VT100ScreenMarkReading>)predecessor;
+- (id<VT100ScreenMarkReading> _Nullable)screenMarkBeforeScreenMark:(id<VT100ScreenMarkReading>)successor;
 - (NSArray<id<PTYAnnotationReading>> *)annotationsOnAbsLine:(long long)absLine;
 - (id<iTermPathMarkReading>)pathMarkAt:(VT100GridCoord)coord;
 

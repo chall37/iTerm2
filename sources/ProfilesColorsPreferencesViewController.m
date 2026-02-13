@@ -69,6 +69,7 @@ static NSString * const kColorGalleryURL = @"https://www.iterm2.com/colorgallery
     IBOutlet iTermSettingsColorWell *_selectedTextColor;
     IBOutlet iTermSettingsColorWell *_cursorColor;
     IBOutlet iTermSettingsColorWell *_cursorTextColor;
+    IBOutlet iTermSettingsColorWell *_imeCursorColor;
     IBOutlet iTermSettingsColorWell *_tabColor;
     IBOutlet iTermSettingsColorWell *_underlineColor;
     IBOutlet iTermSettingsColorWell *_badgeColor;
@@ -91,10 +92,13 @@ static NSString * const kColorGalleryURL = @"https://www.iterm2.com/colorgallery
 
     IBOutlet NSTextField *_cursorColorLabel;
     IBOutlet NSTextField *_cursorTextColorLabel;
+    IBOutlet NSTextField *_imeCursorColorLabel;
 
     IBOutlet NSButton *_useTabColor;
     IBOutlet NSButton *_useUnderlineColor;
     IBOutlet NSButton *_useSmartCursorColor;
+    IBOutlet NSButton *_useActivePaneBorder;
+    IBOutlet iTermSettingsColorWell *_activePaneBorderColor;
 
     IBOutlet NSSlider *_minimumContrast;
     IBOutlet NSTextField *_faintTextAlphaLabel;
@@ -264,6 +268,12 @@ static NSString * const kColorGalleryURL = @"https://www.iterm2.com/colorgallery
                           type:kPreferenceInfoTypeCheckbox];
     info.observer = ^() { [weakSelf updateColorControlsEnabled]; };
 
+    info = [self defineControl:_useActivePaneBorder
+                           key:KEY_USE_ACTIVE_PANE_BORDER
+                   relatedView:nil
+                          type:kPreferenceInfoTypeCheckbox];
+    info.observer = ^() { [weakSelf updateColorControlsEnabled]; };
+
     info = [self defineControl:_minimumContrast
                            key:KEY_MINIMUM_CONTRAST
                    relatedView:_minimumContrastLabel
@@ -420,6 +430,7 @@ static NSString * const kColorGalleryURL = @"https://www.iterm2.com/colorgallery
     _tabColor.enabled = [self boolForKey:KEY_USE_TAB_COLOR];
     _selectedTextColor.enabled = [self boolForKey:KEY_USE_SELECTED_TEXT_COLOR];
     _underlineColor.enabled = [self boolForKey:KEY_USE_UNDERLINE_COLOR];
+    _activePaneBorderColor.enabled = [self boolForKey:KEY_USE_ACTIVE_PANE_BORDER];
 
     const BOOL smartCursorColorSelected = [self boolForKey:KEY_SMART_CURSOR_COLOR];
     const BOOL shouldEnableSmartCursorColor = ([self intForKey:KEY_CURSOR_TYPE] == CURSOR_BOX);
@@ -458,10 +469,12 @@ static NSString * const kColorGalleryURL = @"https://www.iterm2.com/colorgallery
               KEY_SELECTED_TEXT_COLOR: _selectedTextColor,
               KEY_CURSOR_COLOR: _cursorColor,
               KEY_CURSOR_TEXT_COLOR: _cursorTextColor,
+              KEY_IME_CURSOR_COLOR: _imeCursorColor,
               KEY_TAB_COLOR: _tabColor,
               KEY_UNDERLINE_COLOR: _underlineColor,
               KEY_CURSOR_GUIDE_COLOR: _guideColor,
-              KEY_BADGE_COLOR: _badgeColor };
+              KEY_BADGE_COLOR: _badgeColor,
+              KEY_ACTIVE_PANE_BORDER_COLOR: _activePaneBorderColor };
 }
 
 - (NSDictionary *)colorWellRelatedViews {
@@ -479,6 +492,7 @@ static NSString * const kColorGalleryURL = @"https://www.iterm2.com/colorgallery
               KEY_SELECTED_TEXT_COLOR: _selectedTextColorEnabledButton,
               KEY_CURSOR_COLOR: _cursorColorLabel,
               KEY_CURSOR_TEXT_COLOR: _cursorTextColorLabel,
+              KEY_IME_CURSOR_COLOR: _imeCursorColorLabel,
               KEY_BADGE_COLOR: _badgeColorLabel };
 }
 

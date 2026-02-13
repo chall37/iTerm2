@@ -13,6 +13,15 @@ extern NSString *const kSelectionRespectsSoftBoundariesKey;
 
 @interface iTermUserDefaults : NSObject
 
+// Call this before any access to +userDefaults to use a custom suite instead of standardUserDefaults.
++ (void)setCustomSuiteName:(nullable NSString *)suiteName;
+
+// Returns the custom suite name if one was set via setCustomSuiteName:, otherwise nil.
++ (nullable NSString *)customSuiteName;
+
+// Returns the custom suite if set, otherwise standardUserDefaults.
++ (NSUserDefaults *)userDefaults;
+
 + (void)performMigrations;
 
 @property (class, nonatomic, copy) NSArray<NSString *> *searchHistory;
@@ -38,6 +47,7 @@ typedef NS_ENUM(NSUInteger, iTermAppleWindowTabbingMode) {
 @property (class, nonatomic) BOOL probeForPassword;
 @property (class, nonatomic, copy, nullable) NSString *importPath;
 @property (class, nonatomic) BOOL shouldSendReturnAfterPassword;
+@property (class, nonatomic, copy, nullable) NSDictionary<NSString *, NSNumber *> *windowCornerRadiusCache;
 
 @end
 
