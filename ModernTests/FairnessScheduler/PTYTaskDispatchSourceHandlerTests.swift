@@ -11,29 +11,57 @@ import XCTest
 final class PTYTaskEventHandlerTests: XCTestCase {
 
     func testHandleReadEventMethodExists() {
-        // REQUIREMENT: PTYTask must have handleReadEvent method
+        // REQUIREMENT: PTYTaskIOHandler must have handleReadEvent (private, invoked by dispatch source)
+        // After extraction, this method lives on PTYTaskIOHandler, not PTYTask.
+        // Verify the handler exists and is correctly wired by checking that
+        // dispatch sources are created (which use handleReadEvent internally).
 
         guard let task = PTYTask() else {
             XCTFail("Failed to create PTYTask")
             return
         }
 
-        let selector = NSSelectorFromString("handleReadEvent")
-        XCTAssertTrue(task.responds(to: selector),
-                      "PTYTask should have handleReadEvent method")
+        guard let pipe = createTestPipe() else {
+            XCTFail("Failed to create test pipe")
+            return
+        }
+        defer { closeTestPipe(pipe) }
+
+        task.testSetFd(pipe.readFd)
+        task.testSetupDispatchSourcesForTesting()
+        task.testWaitForIOQueue()
+
+        // If the handler is correctly wired, read source exists
+        XCTAssertTrue(task.testHasReadSource,
+                      "Read source should exist (handleReadEvent is internal to handler)")
+
+        task.testTeardownDispatchSourcesForTesting()
     }
 
     func testHandleWriteEventMethodExists() {
-        // REQUIREMENT: PTYTask must have handleWriteEvent method
+        // REQUIREMENT: PTYTaskIOHandler must have handleWriteEvent (private, invoked by dispatch source)
+        // After extraction, this method lives on PTYTaskIOHandler, not PTYTask.
 
         guard let task = PTYTask() else {
             XCTFail("Failed to create PTYTask")
             return
         }
 
-        let selector = NSSelectorFromString("handleWriteEvent")
-        XCTAssertTrue(task.responds(to: selector),
-                      "PTYTask should have handleWriteEvent method")
+        guard let pipe = createTestPipe() else {
+            XCTFail("Failed to create test pipe")
+            return
+        }
+        defer { closeTestPipe(pipe) }
+
+        task.testSetFd(pipe.writeFd)
+        task.testSetupDispatchSourcesForTesting()
+        task.testWaitForIOQueue()
+
+        // If the handler is correctly wired, write source exists
+        XCTAssertTrue(task.testHasWriteSource,
+                      "Write source should exist (handleWriteEvent is internal to handler)")
+
+        task.testTeardownDispatchSourcesForTesting()
     }
 
     func testWriteBufferDidChangeWakesWriteSource() {

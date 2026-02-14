@@ -81,26 +81,15 @@ static int unblockPipeW;
 }
 
 - (void)registerTask:(id<iTermTask>)task {
-    // Check if task uses dispatch_source for I/O (FairnessScheduler path).
-    // If so, skip adding to _tasks - the task handles its own I/O via dispatch sources.
-    // We still call didRegister to set up those dispatch sources.
-    BOOL usesDispatchSource = NO;
-    if ([task respondsToSelector:@selector(useDispatchSource)]) {
-        usesDispatchSource = [task useDispatchSource];
-    }
-
-    if (!usesDispatchSource) {
-        // Legacy path: add task to select() loop
-        PtyTaskDebugLog(@"registerTask: lock\n");
-        [tasksLock lock];
-        PtyTaskDebugLog(@"Add task at %p\n", (void*)task);
-        [_tasks addObject:task];
-        PtyTaskDebugLog(@"There are now %lu tasks\n", (unsigned long)_tasks.count);
-        tasksChanged = YES;
-        PtyTaskDebugLog(@"registerTask: unlock\n");
-        [tasksLock unlock];
-        [self unblock];
-    }
+    PtyTaskDebugLog(@"registerTask: lock\n");
+    [tasksLock lock];
+    PtyTaskDebugLog(@"Add task at %p\n", (void*)task);
+    [_tasks addObject:task];
+    PtyTaskDebugLog(@"There are now %lu tasks\n", (unsigned long)_tasks.count);
+    tasksChanged = YES;
+    PtyTaskDebugLog(@"registerTask: unlock\n");
+    [tasksLock unlock];
+    [self unblock];
 
     __weak __typeof(task) weakTask = task;
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -109,18 +98,9 @@ static int unblockPipeW;
 }
 
 - (void)deregisterTask:(id<iTermTask>)task {
-    // Check if task uses dispatch_source (FairnessScheduler path).
-    // Such tasks were never added to _tasks, but we still need deadpool handling.
-    BOOL usesDispatchSource = NO;
-    if ([task respondsToSelector:@selector(useDispatchSource)]) {
-        usesDispatchSource = [task useDispatchSource];
-    }
-
     PtyTaskDebugLog(@"deregisterTask: lock\n");
     [tasksLock lock];
     PtyTaskDebugLog(@"Begin remove task %p\n", (void*)task);
-
-    // Always handle deadpool - needed for waitpid() cleanup regardless of I/O path
     PtyTaskDebugLog(@"Add %d to deadpool", [task pid]);
     pid_t pidToWaitOn = task.pidToWaitOn;
     if (pidToWaitOn > 0) {
@@ -129,19 +109,14 @@ static int unblockPipeW;
     if ([task hasCoprocess]) {
         [deadpool addObject:@([[task coprocess] pid])];
     }
-
-    if (!usesDispatchSource) {
-        // Legacy path: remove from _tasks
-        [_tasks removeObject:task];
-        tasksChanged = YES;
-    }
-
+    [_tasks removeObject:task];
+    tasksChanged = YES;
     PtyTaskDebugLog(@"End remove task %p. There are now %lu tasks.\n",
                     (void *)task,
                     (unsigned long)[_tasks count]);
     PtyTaskDebugLog(@"deregisterTask: unlock\n");
     [tasksLock unlock];
-    [self unblock];  // Wake up run loop to process deadpool
+    [self unblock];
 }
 
 // NB: This is currently used for coprocesses.
@@ -316,32 +291,19 @@ void UnblockTaskNotifier(void) {
             if (fd < 0) {
                 PtyTaskDebugLog(@"Task has fd of %d\n", fd);
             } else {
-                // Check if task uses dispatch_source for I/O (optional protocol method)
-                BOOL usesDispatchSource = NO;
-                if ([task respondsToSelector:@selector(useDispatchSource)]) {
-                    usesDispatchSource = [task useDispatchSource];
+                // PtyTaskDebugLog(@"Select on fd %d\n", fd);
+                if (fd > highfd) {
+                    highfd = fd;
                 }
-
-                if (!usesDispatchSource) {
-                    // Legacy path - add task's FD to select() sets
-                    // PtyTaskDebugLog(@"Select on fd %d\n", fd);
-                    if (fd > highfd) {
-                        highfd = fd;
-                    }
-                    if ([task wantsRead]) {
-                        FD_SET(fd, &rfds);
-                    }
-                    if ([task wantsWrite]) {
-                        FD_SET(fd, &wfds);
-                    }
-                    FD_SET(fd, &efds);
+                if ([task wantsRead]) {
+                    FD_SET(fd, &rfds);
                 }
-                // else: Task uses dispatch_source - skip FD_SET for task's main FD
+                if ([task wantsWrite]) {
+                    FD_SET(fd, &wfds);
+                }
+                FD_SET(fd, &efds);
             }
 
-            // Coprocess handling for legacy (non-dispatch-source) tasks only.
-            // Dispatch-source tasks handle their own coprocess I/O via PTYTask's
-            // coprocess dispatch sources (setupCoprocessDispatchSources:).
             @synchronized (task) {
                 Coprocess *coprocess = [task coprocess];
                 if (coprocess) {
@@ -420,25 +382,16 @@ void UnblockTaskNotifier(void) {
                 [[task retain] autorelease];
                 [handledFds addObject:@(fd)];
 
-                // Check if task uses dispatch_source for I/O
-                BOOL usesDispatchSource = NO;
-                if ([task respondsToSelector:@selector(useDispatchSource)]) {
-                    usesDispatchSource = [task useDispatchSource];
+                if ([self handleReadOnFileDescriptor:fd task:task fdSet:&rfds]) {
+                    iter = [_tasks objectEnumerator];
                 }
-
-                // Only handle task's main FD via select() if not using dispatch_source
-                if (!usesDispatchSource) {
-                    if ([self handleReadOnFileDescriptor:fd task:task fdSet:&rfds]) {
-                        iter = [_tasks objectEnumerator];
-                    }
-                    if ([self handleWriteOnFileDescriptor:fd task:task fdSet:&wfds]) {
-                        iter = [_tasks objectEnumerator];
-                    }
-                    if ([self handleErrorOnFileDescriptor:fd task:task fdSet:&efds]) {
-                        iter = [_tasks objectEnumerator];
-                    }
+                if ([self handleWriteOnFileDescriptor:fd task:task fdSet:&wfds]) {
+                    iter = [_tasks objectEnumerator];
                 }
-                // Coprocess handling for legacy tasks (dispatch-source tasks handle their own)
+                if ([self handleErrorOnFileDescriptor:fd task:task fdSet:&efds]) {
+                    iter = [_tasks objectEnumerator];
+                }
+                // Move input around between coprocess and main process.
                 if ([task fd] >= 0 && ![task hasBrokenPipe]) {  // Make sure the pipe wasn't just broken.
                     @synchronized (task) {
                         Coprocess *coprocess = [task coprocess];

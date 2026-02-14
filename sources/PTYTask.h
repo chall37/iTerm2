@@ -17,6 +17,7 @@
 @class iTermWinSizeController;
 @class PTYTab;
 @class PTYTask;
+@class PTYTaskIOHandler;
 
 @protocol PTYTaskDelegate <NSObject>
 // Runs in a background thread. Should do as much work as possible in this
@@ -199,6 +200,12 @@ typedef NS_OPTIONS(NSUInteger, iTermJobManagerAttachResults) {
 - (void)updateReadSourceState;
 
 + (NSMutableDictionary *)mutableEnvironmentDictionary;
+
+// Register or deregister a task, routing through TaskNotifier for legacy tasks
+// or directly managing dispatch sources for fairness-scheduled tasks.
+// Job managers should call these instead of TaskNotifier directly.
++ (void)registerTaskWithNotifier:(id<iTermTask>)task;
++ (void)deregisterTaskFromNotifier:(id<iTermTask>)task;
 
 - (instancetype)init;
 

@@ -268,48 +268,6 @@ final class PTYTaskDispatchSourceLifecycleTests: XCTestCase {
     }
 }
 
-final class PTYTaskUseDispatchSourceTests: XCTestCase {
-
-    override func setUp() {
-        super.setUp()
-        iTermAdvancedSettingsModel.setUseFairnessSchedulerForTesting(true)
-    }
-
-    override func tearDown() {
-        iTermAdvancedSettingsModel.setUseFairnessSchedulerForTesting(false)
-        super.tearDown()
-    }
-
-    func testUseDispatchSourceMethodExists() {
-        // REQUIREMENT: PTYTask must respond to useDispatchSource
-
-        guard let task = PTYTask() else {
-            XCTFail("Failed to create PTYTask")
-            return
-        }
-
-        let selector = NSSelectorFromString("useDispatchSource")
-        XCTAssertTrue(task.responds(to: selector),
-                      "PTYTask should respond to useDispatchSource")
-    }
-
-    func testUseDispatchSourceReturnsTrue() {
-        // REQUIREMENT: PTYTask.useDispatchSource should return YES
-
-        guard let task = PTYTask() else {
-            XCTFail("Failed to create PTYTask")
-            return
-        }
-
-        // Get the value using KVC
-        if let result = task.value(forKey: "useDispatchSource") as? Bool {
-            XCTAssertTrue(result, "PTYTask.useDispatchSource should return YES")
-        } else {
-            XCTFail("Could not read useDispatchSource value")
-        }
-    }
-}
-
 // MARK: - State Transition Tests
 
 /// Tests for state transition correctness

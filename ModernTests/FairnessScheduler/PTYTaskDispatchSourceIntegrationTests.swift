@@ -476,9 +476,9 @@ final class PTYTaskBackpressureIntegrationTests: XCTestCase {
     }
 }
 
-// MARK: - 3.7 useDispatchSource Protocol Tests
+// MARK: - Edge Case Tests
 
-/// Tests for the useDispatchSource protocol method (3.7)
+/// Tests for PTYTask edge cases and nil-safety
 final class PTYTaskEdgeCaseTests: XCTestCase {
 
     func testFreshTaskHasValidState() {

@@ -24,16 +24,6 @@ import Foundation
     @objc var hasBrokenPipe: Bool = false
     @objc var sshIntegrationActive: Bool = false
 
-    // MARK: - Configuration for Testing
-
-    /// Set to true to make useDispatchSource return YES.
-    /// Default is NO (use select() path).
-    var dispatchSourceEnabled: Bool = false
-
-    /// If true, this mock does NOT respond to useDispatchSource selector,
-    /// simulating a legacy task that relies on select().
-    var simulateLegacyTask: Bool = false
-
     // MARK: - Call Tracking
 
     private(set) var processReadCallCount: Int = 0
@@ -68,21 +58,6 @@ import Foundation
         didRegisterCallCount += 1
     }
 
-    // MARK: - iTermTask Optional Methods
-
-    @objc func useDispatchSource() -> Bool {
-        return dispatchSourceEnabled
-    }
-
-    // MARK: - Override respondsToSelector for Legacy Simulation
-
-    override func responds(to aSelector: Selector!) -> Bool {
-        if simulateLegacyTask && aSelector == #selector(useDispatchSource) {
-            return false
-        }
-        return super.responds(to: aSelector)
-    }
-
     // MARK: - Test Helpers
 
     func reset() {
@@ -92,8 +67,6 @@ import Foundation
         didRegisterCallCount = 0
         writeTaskCoprocessCallCount = 0
         lastCoprocessData = nil
-        dispatchSourceEnabled = false
-        simulateLegacyTask = false
         wantsRead = true
         wantsWrite = false
         hasCoprocess = false

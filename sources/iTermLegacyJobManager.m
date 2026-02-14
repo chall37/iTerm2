@@ -9,6 +9,7 @@
 
 #import "DebugLogging.h"
 #import "iTermProcessCache.h"
+#import "PTYTask.h"
 #import "NSArray+iTerm.h"
 #import "PTYTask+MRR.h"
 #import "TaskNotifier.h"
@@ -89,7 +90,7 @@
     });
     if (status == iTermJobManagerForkAndExecStatusSuccess) {
         DLog(@"Register task for pid %@", @(self.childPid));
-        [[TaskNotifier sharedInstance] registerTask:task];
+        [PTYTask registerTaskWithNotifier:task];
     }
     if (completion) {
         completion(status, nil);

@@ -47,6 +47,9 @@
 @interface PTYTask(WinSizeControllerDelegate)<iTermWinSizeControllerDelegate>
 @end
 
+@interface PTYTask()<PTYTaskIOHandlerDelegate>
+@end
+
 static void HandleSigChld(int n) {
     // This is safe to do because write(2) is listed in the sigaction(2) man page
     // as allowed in a signal handler. Calling a method is *NOT* safe since something might
@@ -73,26 +76,9 @@ static void HandleSigChld(int n) {
     dispatch_queue_t _jobManagerQueue;
     BOOL _isTmuxTask;
 
-    // Dispatch sources for per-PTY I/O (fairness scheduler integration).
-    // Created on main queue in setupDispatchSources; nil'd on any queue in teardownDispatchSources.
-    // Handlers run on _ioQueue.
-    dispatch_source_t _readSource;
-    dispatch_source_t _writeSource;
-    // Created on main queue in setupDispatchSources, constant after setup.
-    dispatch_queue_t _ioQueue;
-    // Access on _ioQueue only (suspend/resume state tracking)
-    BOOL _readSourceSuspended;
-    // Access on _ioQueue only
-    BOOL _writeSourceSuspended;
-
-    // Dispatch sources for coprocess I/O (fairness scheduler integration).
-    // Created/destroyed on main queue or _ioQueue; handlers run on _ioQueue.
-    dispatch_source_t _coprocessReadSource;   // reads coprocess stdout
-    dispatch_source_t _coprocessWriteSource;  // flushes outputBuffer to coprocess stdin
-    // Access on _ioQueue only
-    BOOL _coprocessReadSourceSuspended;
-    // Access on _ioQueue only
-    BOOL _coprocessWriteSourceSuspended;
+    // Fairness scheduler I/O handler. nil until didRegister when fairness scheduler is on.
+    // Owns dispatch sources for PTY and coprocess I/O.
+    PTYTaskIOHandler *_ioHandler;
 
     // Test hook to override shouldWrite for testing write source resume. Any queue.
     BOOL _testShouldWriteOverride;
@@ -128,7 +114,8 @@ static void HandleSigChld(int n) {
 - (void)dealloc {
     DLog(@"Dealloc PTYTask %p", self);
     // Tear down dispatch sources before releasing
-    [self teardownDispatchSources];
+    [_ioHandler teardown];
+    _ioHandler = nil;
     // TODO: The use of killpg seems pretty sketchy. It takes a pgid_t, not a
     // pid_t. Are they guaranteed to always be the same for process group
     // leaders? It is not clear from git history why killpg is used here and
@@ -156,6 +143,37 @@ static void HandleSigChld(int n) {
             _tmuxClientProcessID];
 }
 
+#pragma mark - Task Registration
+
++ (void)registerTaskWithNotifier:(id<iTermTask>)task {
+    if ([iTermAdvancedSettingsModel useFairnessScheduler]) {
+        // Fairness tasks handle I/O via PTYTaskIOHandler dispatch sources.
+        // Skip TaskNotifier entirely — just dispatch didRegister on main queue.
+        __weak __typeof(task) weakTask = task;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [weakTask didRegister];
+        });
+    } else {
+        [[TaskNotifier sharedInstance] registerTask:task];
+    }
+}
+
++ (void)deregisterTaskFromNotifier:(id<iTermTask>)task {
+    if ([iTermAdvancedSettingsModel useFairnessScheduler]) {
+        // Fairness task was never registered with TaskNotifier.
+        // Handle waitpid cleanup directly.
+        pid_t pidToWaitOn = task.pidToWaitOn;
+        if (pidToWaitOn > 0) {
+            [[TaskNotifier sharedInstance] waitForPid:pidToWaitOn];
+        }
+        if ([task hasCoprocess]) {
+            [[TaskNotifier sharedInstance] waitForPid:[[task coprocess] pid]];
+        }
+    } else {
+        [[TaskNotifier sharedInstance] deregisterTask:task];
+    }
+}
+
 #pragma mark - APIs
 
 - (BOOL)paused {
@@ -170,9 +188,9 @@ static void HandleSigChld(int n) {
     }
     // Start/stop selecting on our FD
     [[TaskNotifier sharedInstance] unblock];
-    // Update dispatch sources based on new paused state
-    [self updateReadSourceState];
-    [self updateWriteSourceState];
+    // Update dispatch sources based on new paused state (no-op if handler is nil)
+    [_ioHandler updateReadSourceState];
+    [_ioHandler updateWriteSourceState];
     [_delegate taskDidChangePaused:self paused:paused];
 }
 
@@ -241,18 +259,17 @@ static void HandleSigChld(int n) {
     DLog(@"Set coprocess of %@ to %@", self, coprocess);
 
     // Tear down old coprocess dispatch sources before swapping the ivar.
-    if ([self useDispatchSource] && _coprocessReadSource) {
-        [self teardownCoprocessDispatchSources];
-    }
+    [_ioHandler teardownCoprocessSources];
 
     @synchronized (self) {
         coprocess_ = coprocess;
         self.hasMuteCoprocess = coprocess_.mute;
     }
 
-    // Set up dispatch sources for the new coprocess (if using dispatch source path).
-    if ([self useDispatchSource] && coprocess) {
-        [self setupCoprocessDispatchSources:coprocess];
+    // Set up dispatch sources for the new coprocess (if handler exists).
+    if (_ioHandler && coprocess) {
+        [_ioHandler setupCoprocessSourcesWithReadFd:[coprocess readFileDescriptor]
+                                            writeFd:[coprocess writeFileDescriptor]];
     }
 
     __weak __typeof(self) weakSelf = self;
@@ -415,10 +432,10 @@ static void HandleSigChld(int n) {
     [writeBuffer appendData:data];
     [writeLock unlock];
 
-    // Trigger write dispatch_source (no-op if not set up)
-    // Must be outside writeLock because writeBufferDidChange -> shouldWrite takes writeLock
-    [self writeBufferDidChange];
-    [[TaskNotifier sharedInstance] unblock];  // Still needed for coprocess FD wake-up
+    // Trigger write dispatch_source (no-op if handler is nil)
+    // Must be outside writeLock because shouldWrite takes writeLock
+    [_ioHandler writeBufferDidChange];
+    [[TaskNotifier sharedInstance] unblock];  // Needed for legacy select() path
 }
 
 - (void)killWithMode:(iTermJobManagerKillingMode)mode {
@@ -447,11 +464,9 @@ static void HandleSigChld(int n) {
         brokenPipe_ = YES;
     }
     // Stop dispatch sources immediately to prevent handlers firing on a dead fd.
-    // In fairness mode, tasks aren't in TaskNotifier._tasks so deregisterTask:
-    // won't stop I/O — this is the only teardown path.
-    // No-op in legacy mode (sources are nil).
-    [self teardownDispatchSources];
-    [[TaskNotifier sharedInstance] deregisterTask:self];
+    [_ioHandler teardown];
+    _ioHandler = nil;
+    [PTYTask deregisterTaskFromNotifier:self];
     [self.delegate threadedTaskBrokenPipe];
 }
 
@@ -464,7 +479,9 @@ static void HandleSigChld(int n) {
     // via the executor==nil fallback path in shouldRead.
     [self.delegate taskDidRegister:self];
     if ([iTermAdvancedSettingsModel useFairnessScheduler]) {
-        [self setupDispatchSources];
+        _ioHandler = [[PTYTaskIOHandler alloc] initWithFd:self.fd];
+        _ioHandler.delegate = self;
+        [_ioHandler start];
     }
 }
 
@@ -539,112 +556,7 @@ static void HandleSigChld(int n) {
     [writeLock unlock];
 }
 
-#pragma mark - Dispatch Source Management (Fairness Scheduler)
-
-// Main queue. Only call after fd >= 0 (i.e., after process launch succeeds).
-- (void)setupDispatchSources {
-    NSAssert(self.fd >= 0, @"setupDispatchSources called with invalid fd");
-
-    _ioQueue = dispatch_queue_create("com.iterm2.pty-io", DISPATCH_QUEUE_SERIAL);
-
-    // Read source - starts SUSPENDED, will be resumed by updateReadSourceState if conditions allow
-    _readSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ,
-                                         self.fd, 0, _ioQueue);
-    __weak typeof(self) weakSelf = self;
-    dispatch_source_set_event_handler(_readSource, ^{
-        [weakSelf handleReadEvent];
-    });
-    dispatch_resume(_readSource);  // Must resume before we can suspend
-    dispatch_suspend(_readSource); // Start suspended - updateReadSourceState will resume
-    _readSourceSuspended = YES;
-
-    // Write source - starts SUSPENDED until writeBuffer has data
-    _writeSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_WRITE,
-                                          self.fd, 0, _ioQueue);
-    dispatch_source_set_event_handler(_writeSource, ^{
-        [weakSelf handleWriteEvent];
-    });
-    dispatch_resume(_writeSource);  // Must resume before we can suspend
-    dispatch_suspend(_writeSource); // Start suspended - updateWriteSourceState will resume
-    _writeSourceSuspended = YES;
-
-    // Initial state sync - resume sources if conditions allow
-    [self updateReadSourceState];
-    [self updateWriteSourceState];
-}
-
-// Any queue. Must resume suspended sources before canceling to avoid crash.
-- (void)teardownDispatchSources {
-    // Also tear down coprocess sources — they share _ioQueue.
-    [self teardownCoprocessDispatchSources];
-
-    dispatch_queue_t ioQueue = _ioQueue;
-    dispatch_source_t readSource = _readSource;
-    dispatch_source_t writeSource = _writeSource;
-
-    // Clear source ivars first - this prevents updateReadSourceState/updateWriteSourceState
-    // from dispatching any NEW blocks (they check _readSource/_writeSource != nil first).
-    _readSource = nil;
-    _writeSource = nil;
-
-    if (!ioQueue) {
-        return;
-    }
-
-    // Check if we're already on ioQueue to avoid deadlock from dispatch_sync.
-    const char *currentLabel = dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL);
-    const char *ioQueueLabel = dispatch_queue_get_label(ioQueue);
-    BOOL onIOQueue = (currentLabel != NULL && ioQueueLabel != NULL &&
-                      strcmp(currentLabel, ioQueueLabel) == 0);
-
-    if (onIOQueue) {
-        // Already on ioQueue - do teardown inline with current state.
-        // No race here since we're already serialized on ioQueue.
-        if (readSource) {
-            if (_readSourceSuspended) {
-                dispatch_resume(readSource);
-            }
-            dispatch_source_cancel(readSource);
-        }
-        if (writeSource) {
-            if (_writeSourceSuspended) {
-                dispatch_resume(writeSource);
-            }
-            dispatch_source_cancel(writeSource);
-        }
-    } else {
-        // Not on ioQueue - use sync to capture state, then async to teardown.
-        // The sync ensures all prior updateRead/WriteSourceState blocks have completed,
-        // giving us the actual current state.
-        __block BOOL readSuspended = NO;
-        __block BOOL writeSuspended = NO;
-        dispatch_sync(ioQueue, ^{
-            readSuspended = self->_readSourceSuspended;
-            writeSuspended = self->_writeSourceSuspended;
-        });
-
-        // Now teardown synchronously with the captured (consistent) state.
-        // Using dispatch_sync ensures all cleanup completes before we return,
-        // preventing races where the task is deallocated while blocks are pending.
-        // No self access here - just the captured sources and suspend flags.
-        dispatch_sync(ioQueue, ^{
-            if (readSource) {
-                if (readSuspended) {
-                    dispatch_resume(readSource);
-                }
-                dispatch_source_cancel(readSource);
-            }
-            if (writeSource) {
-                if (writeSuspended) {
-                    dispatch_resume(writeSource);
-                }
-                dispatch_source_cancel(writeSource);
-            }
-        });
-    }
-}
-
-#pragma mark - Unified State Check
+#pragma mark - PTYTaskIOHandlerDelegate
 
 // Any queue. Helper to get effective ioAllowed, considering test override.
 - (BOOL)effectiveIoAllowed {
@@ -681,221 +593,65 @@ static void HandleSigChld(int n) {
     return hasData;
 }
 
-// Any queue. Captures shouldRead snapshot, then dispatches to _ioQueue for source suspend/resume.
+// Any queue. Forwards to handler.
 - (void)updateReadSourceState {
-    if (!_ioQueue || !_readSource) {
-        return;
-    }
-    BOOL shouldRead = [self shouldRead];
-    dispatch_async(_ioQueue, ^{
-        if (shouldRead && self->_readSourceSuspended && self->_readSource) {
-            dispatch_resume(self->_readSource);
-            self->_readSourceSuspended = NO;
-        } else if (!shouldRead && !self->_readSourceSuspended && self->_readSource) {
-            dispatch_suspend(self->_readSource);
-            self->_readSourceSuspended = YES;
-        }
-    });
+    [_ioHandler updateReadSourceState];
 }
 
-// Any queue. Captures shouldWrite snapshot, then dispatches to _ioQueue for source suspend/resume.
+// Any queue. Forwards to handler.
 - (void)updateWriteSourceState {
-    if (!_ioQueue || !_writeSource) {
-        return;
-    }
-    BOOL shouldWrite = [self shouldWrite];
-    dispatch_async(_ioQueue, ^{
-        if (shouldWrite && self->_writeSourceSuspended && self->_writeSource) {
-            dispatch_resume(self->_writeSource);
-            self->_writeSourceSuspended = NO;
-        } else if (!shouldWrite && !self->_writeSourceSuspended && self->_writeSource) {
-            dispatch_suspend(self->_writeSource);
-            self->_writeSourceSuspended = YES;
-        }
-    });
+    [_ioHandler updateWriteSourceState];
 }
 
-#pragma mark - Dispatch Source Event Handlers
-
-// _ioQueue (dispatch source event handler)
-- (void)handleReadEvent {
-    ITDebugAssert(strcmp(dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL),
-                         dispatch_queue_get_label(_ioQueue)) == 0);
-    // Match processRead's batching: read up to 4KB (4 * MAXRW) per event
-    // to reduce dispatch overhead while maintaining responsiveness.
-    int iterations = 4;
-    int totalBytesRead = 0;
-    BOOL gotEOF = NO;
-    char buffer[MAXRW * iterations];
-
-    for (int i = 0; i < iterations; ++i) {
-        ssize_t n = read(self.fd, buffer + totalBytesRead, MAXRW);
-        if (n < 0) {
-            if (errno != EAGAIN && errno != EINTR) {
-                [self brokenPipe];
-                return;
-            }
-            // EAGAIN/EINTR - stop reading but process what we have
-            break;
-        }
-        if (n == 0) {
-            // EOF - PTY slave side closed (child exited).
-            // Deliver any buffered bytes before signaling broken pipe.
-            gotEOF = YES;
-            break;
-        }
-        totalBytesRead += n;
-        if (n < MAXRW) {
-            // Got less than requested - no more data available
-            break;
-        }
-    }
-
-    if (totalBytesRead > 0) {
-        hasOutput = YES;
-
-        // Send data to delegate via non-blocking path
-        // (addTokens internally calls notifyScheduler which kicks FairnessScheduler)
-        [self.delegate threadedReadTask:buffer length:totalBytesRead];
-
-        // Route PTY output to coprocess (same as readTask:length:)
-        @synchronized (self) {
-            if (coprocess_ && !self.sshIntegrationActive) {
-                [self writeToCoprocess:[NSData dataWithBytes:buffer length:totalBytesRead]];
-            }
-        }
-
-        // Re-check state after read (backpressure may have increased)
-        [self updateReadSourceState];
-    }
-
-    if (gotEOF) {
-        [self brokenPipe];
-    }
-}
-
-// _ioQueue (dispatch source event handler)
-- (void)handleWriteEvent {
-    ITDebugAssert(strcmp(dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL),
-                         dispatch_queue_get_label(_ioQueue)) == 0);
-    [self processWrite];  // Existing method - drains writeBuffer
-
-    // Re-check state after write (buffer may now be empty)
-    [self updateWriteSourceState];
-
-    // Write buffer shrank — coprocess read source may now be eligible to resume
-    // (it suspends when writeBufferHasRoom returns NO).
-    [self updateCoprocessReadSourceState];
-}
-
-// Any queue. Called when data is added to writeBuffer.
+// Any queue. Forwards to handler.
 - (void)writeBufferDidChange {
-    [self updateWriteSourceState];
+    [_ioHandler writeBufferDidChange];
 }
 
-#pragma mark - Coprocess Dispatch Sources (Fairness Scheduler)
-
-// Main queue or _ioQueue (setCoprocess: can be called from either)
-- (void)setupCoprocessDispatchSources:(Coprocess *)coprocess {
-    NSAssert(_ioQueue != nil, @"setupCoprocessDispatchSources called before _ioQueue created");
-
-    int readFd = [coprocess readFileDescriptor];
-    int writeFd = [coprocess writeFileDescriptor];
-    if (readFd < 0 || writeFd < 0) {
-        return;
-    }
-
-    __weak typeof(self) weakSelf = self;
-
-    // Read source — reads coprocess stdout, feeds data back as PTY input
-    _coprocessReadSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ,
-                                                   readFd, 0, _ioQueue);
-    dispatch_source_set_event_handler(_coprocessReadSource, ^{
-        [weakSelf handleCoprocessReadEvent];
-    });
-    dispatch_resume(_coprocessReadSource);
-    dispatch_suspend(_coprocessReadSource);
-    _coprocessReadSourceSuspended = YES;
-
-    // Write source — flushes outputBuffer to coprocess stdin
-    _coprocessWriteSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_WRITE,
-                                                    writeFd, 0, _ioQueue);
-    dispatch_source_set_event_handler(_coprocessWriteSource, ^{
-        [weakSelf handleCoprocessWriteEvent];
-    });
-    dispatch_resume(_coprocessWriteSource);
-    dispatch_suspend(_coprocessWriteSource);
-    _coprocessWriteSourceSuspended = YES;
-
-    [self updateCoprocessReadSourceState];
-    [self updateCoprocessWriteSourceState];
+// Any queue. Tears down dispatch sources via handler.
+- (void)teardownDispatchSources {
+    [_ioHandler teardown];
 }
 
-// Any queue (handles both main and _ioQueue internally)
-- (void)teardownCoprocessDispatchSources {
-    dispatch_source_t readSource = _coprocessReadSource;
-    dispatch_source_t writeSource = _coprocessWriteSource;
+- (BOOL)ioHandlerShouldRead:(PTYTaskIOHandler *)handler {
+    return [self shouldRead];
+}
 
-    _coprocessReadSource = nil;
-    _coprocessWriteSource = nil;
+- (BOOL)ioHandlerShouldWrite:(PTYTaskIOHandler *)handler {
+    return [self shouldWrite];
+}
 
-    if (!_ioQueue) {
-        return;
+- (BOOL)ioHandlerShouldResumeCoprocessRead:(PTYTaskIOHandler *)handler {
+    @synchronized (self) {
+        return coprocess_ && ![coprocess_ eof] && [self writeBufferHasRoom];
     }
+}
 
-    // Check if we're already on ioQueue to avoid deadlock.
-    const char *currentLabel = dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL);
-    const char *ioQueueLabel = dispatch_queue_get_label(_ioQueue);
-    BOOL onIOQueue = (currentLabel != NULL && ioQueueLabel != NULL &&
-                      strcmp(currentLabel, ioQueueLabel) == 0);
+- (BOOL)ioHandlerShouldResumeCoprocessWrite:(PTYTaskIOHandler *)handler {
+    @synchronized (self) {
+        return coprocess_ && [coprocess_ wantToWrite];
+    }
+}
 
-    if (onIOQueue) {
-        if (readSource) {
-            if (_coprocessReadSourceSuspended) {
-                dispatch_resume(readSource);
-            }
-            dispatch_source_cancel(readSource);
+- (void)ioHandler:(PTYTaskIOHandler *)handler didReadData:(const char *)buffer length:(int)length {
+    hasOutput = YES;
+    [self.delegate threadedReadTask:(char *)buffer length:length];
+    @synchronized (self) {
+        if (coprocess_ && !self.sshIntegrationActive) {
+            [self writeToCoprocess:[NSData dataWithBytes:buffer length:length]];
         }
-        if (writeSource) {
-            if (_coprocessWriteSourceSuspended) {
-                dispatch_resume(writeSource);
-            }
-            dispatch_source_cancel(writeSource);
-        }
-        _coprocessReadSourceSuspended = NO;
-        _coprocessWriteSourceSuspended = NO;
-    } else {
-        __block BOOL readSuspended = NO;
-        __block BOOL writeSuspended = NO;
-        dispatch_sync(_ioQueue, ^{
-            readSuspended = self->_coprocessReadSourceSuspended;
-            writeSuspended = self->_coprocessWriteSourceSuspended;
-        });
-        dispatch_sync(_ioQueue, ^{
-            if (readSource) {
-                if (readSuspended) {
-                    dispatch_resume(readSource);
-                }
-                dispatch_source_cancel(readSource);
-            }
-            if (writeSource) {
-                if (writeSuspended) {
-                    dispatch_resume(writeSource);
-                }
-                dispatch_source_cancel(writeSource);
-            }
-            self->_coprocessReadSourceSuspended = NO;
-            self->_coprocessWriteSourceSuspended = NO;
-        });
     }
 }
 
-#pragma mark - Coprocess Event Handlers
+- (void)ioHandlerDidDetectBrokenPipe:(PTYTaskIOHandler *)handler {
+    [self brokenPipe];
+}
 
-// _ioQueue (dispatch source event handler)
-- (void)handleCoprocessReadEvent {
-    ITDebugAssert(strcmp(dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL),
-                         dispatch_queue_get_label(_ioQueue)) == 0);
+- (void)ioHandlerDrainWriteBuffer:(PTYTaskIOHandler *)handler {
+    [self processWrite];
+}
+
+- (void)ioHandlerHandleCoprocessRead:(PTYTaskIOHandler *)handler {
     Coprocess *coprocess;
     @synchronized (self) {
         coprocess = coprocess_;
@@ -916,14 +672,9 @@ static void HandleSigChld(int n) {
     if (data.length > 0) {
         [self writeTask:data coprocess:YES];
     }
-
-    [self updateCoprocessReadSourceState];
 }
 
-// _ioQueue (dispatch source event handler)
-- (void)handleCoprocessWriteEvent {
-    ITDebugAssert(strcmp(dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL),
-                         dispatch_queue_get_label(_ioQueue)) == 0);
+- (void)ioHandlerHandleCoprocessWrite:(PTYTaskIOHandler *)handler {
     Coprocess *coprocess;
     @synchronized (self) {
         coprocess = coprocess_;
@@ -935,11 +686,9 @@ static void HandleSigChld(int n) {
     @synchronized (self) {
         [coprocess write];
     }
-
-    [self updateCoprocessWriteSourceState];
 }
 
-// _ioQueue
+// _ioQueue or delegate callback
 - (void)handleCoprocessEOF {
     Coprocess *coprocess;
     @synchronized (self) {
@@ -957,7 +706,7 @@ static void HandleSigChld(int n) {
         self.hasMuteCoprocess = NO;
     }
 
-    [self teardownCoprocessDispatchSources];
+    [_ioHandler teardownCoprocessSources];
 
     if (pid > 0) {
         [[TaskNotifier sharedInstance] waitForPid:pid];
@@ -970,50 +719,8 @@ static void HandleSigChld(int n) {
     });
 }
 
-#pragma mark - Coprocess Source State Management
-
-// Any queue. Captures coprocess state, then dispatches to _ioQueue for source suspend/resume.
-- (void)updateCoprocessReadSourceState {
-    if (!_ioQueue || !_coprocessReadSource) {
-        return;
-    }
-    BOOL shouldResume;
-    @synchronized (self) {
-        shouldResume = coprocess_ && ![coprocess_ eof] && [self writeBufferHasRoom];
-    }
-    dispatch_async(_ioQueue, ^{
-        if (shouldResume && self->_coprocessReadSourceSuspended && self->_coprocessReadSource) {
-            dispatch_resume(self->_coprocessReadSource);
-            self->_coprocessReadSourceSuspended = NO;
-        } else if (!shouldResume && !self->_coprocessReadSourceSuspended && self->_coprocessReadSource) {
-            dispatch_suspend(self->_coprocessReadSource);
-            self->_coprocessReadSourceSuspended = YES;
-        }
-    });
-}
-
-// Any queue. Captures coprocess state, then dispatches to _ioQueue for source suspend/resume.
-- (void)updateCoprocessWriteSourceState {
-    if (!_ioQueue || !_coprocessWriteSource) {
-        return;
-    }
-    BOOL shouldResume;
-    @synchronized (self) {
-        shouldResume = coprocess_ && [coprocess_ wantToWrite];
-    }
-    dispatch_async(_ioQueue, ^{
-        if (shouldResume && self->_coprocessWriteSourceSuspended && self->_coprocessWriteSource) {
-            dispatch_resume(self->_coprocessWriteSource);
-            self->_coprocessWriteSourceSuspended = NO;
-        } else if (!shouldResume && !self->_coprocessWriteSourceSuspended && self->_coprocessWriteSource) {
-            dispatch_suspend(self->_coprocessWriteSource);
-            self->_coprocessWriteSourceSuspended = YES;
-        }
-    });
-}
-
 - (void)stopCoprocess {
-    [self teardownCoprocessDispatchSources];
+    [_ioHandler teardownCoprocessSources];
 
     pid_t thePid = 0;
     @synchronized (self) {
@@ -1408,13 +1115,6 @@ static void HandleSigChld(int n) {
     return self.jobManager.ioAllowed;
 }
 
-// Any queue. iTermTask @optional protocol method.
-// Returns YES to indicate PTYTask uses dispatch_source for I/O instead of select().
-// TaskNotifier will skip adding this task's FD to select() fd_sets.
-- (BOOL)useDispatchSource {
-    return [iTermAdvancedSettingsModel useFairnessScheduler];
-}
-
 - (BOOL)hasOutput {
     return hasOutput;
 }
@@ -1424,7 +1124,7 @@ static void HandleSigChld(int n) {
         [coprocess_.outputBuffer appendData:data];
     }
     // Wake the coprocess write source so the buffer gets drained.
-    [self updateCoprocessWriteSourceState];
+    [_ioHandler updateCoprocessWriteSourceState];
 }
 
 // The bytes in data were just read from the fd.
@@ -1450,7 +1150,7 @@ static void HandleSigChld(int n) {
     const int fd = self.fd;
     if ([self.jobManager closeFileDescriptor]) {
         DLog(@"Deregister file descriptor %d for process %@ after closing it", fd, @(self.pid));
-        [[TaskNotifier sharedInstance] deregisterTask:self];
+        [PTYTask deregisterTaskFromNotifier:self];
     }
 }
 
@@ -1491,19 +1191,19 @@ static void HandleSigChld(int n) {
 @implementation PTYTask (Testing)
 
 - (BOOL)testHasReadSource {
-    return _readSource != nil;
+    return _ioHandler.testHasReadSource;
 }
 
 - (BOOL)testHasWriteSource {
-    return _writeSource != nil;
+    return _ioHandler.testHasWriteSource;
 }
 
 - (BOOL)testIsReadSourceSuspended {
-    return _readSourceSuspended;
+    return _ioHandler.testIsReadSourceSuspended;
 }
 
 - (BOOL)testIsWriteSourceSuspended {
-    return _writeSourceSuspended;
+    return _ioHandler.testIsWriteSourceSuspended;
 }
 
 - (BOOL)testWriteBufferHasData {
@@ -1523,11 +1223,14 @@ static void HandleSigChld(int n) {
 }
 
 - (void)testSetupDispatchSourcesForTesting {
-    [self setupDispatchSources];
+    _ioHandler = [[PTYTaskIOHandler alloc] initWithFd:self.fd];
+    _ioHandler.delegate = self;
+    [_ioHandler start];
 }
 
 - (void)testTeardownDispatchSourcesForTesting {
-    [self teardownDispatchSources];
+    [_ioHandler teardown];
+    _ioHandler = nil;
 }
 
 - (void)testAppendDataToWriteBuffer:(NSData *)data {
@@ -1553,14 +1256,7 @@ static void HandleSigChld(int n) {
 }
 
 - (void)testWaitForIOQueue {
-    if (!_ioQueue) {
-        return;
-    }
-    // Dispatch a sync block to the ioQueue - this will wait until
-    // all previously queued async work has completed
-    dispatch_sync(_ioQueue, ^{
-        // Empty block - just waiting for queue to drain
-    });
+    [_ioHandler testWaitForIOQueue];
 }
 
 - (void)testWriteFromCoprocess:(NSData *)data {
