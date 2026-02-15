@@ -17,6 +17,7 @@
 @class iTermWinSizeController;
 @class PTYTab;
 @class PTYTask;
+@class PTYTaskIOHandler;
 
 @protocol PTYTaskDelegate <NSObject>
 // Runs in a background thread. Should do as much work as possible in this
@@ -239,6 +240,12 @@ typedef NS_OPTIONS(NSUInteger, iTermJobManagerAttachResults) {
 
 - (void)killWithMode:(iTermJobManagerKillingMode)mode;
 
+// Register or deregister a task, routing through TaskNotifier for legacy tasks
+// or directly managing dispatch sources for per-PTY dispatch source tasks.
+// Job managers should call these instead of TaskNotifier directly.
++ (void)registerTaskWithNotifier:(id<iTermTask>)task;
++ (void)deregisterTaskFromNotifier:(id<iTermTask>)task;
+
 - (void)registerTmuxTask;
 
 - (void)getWorkingDirectoryWithCompletion:(void (^)(NSString *pwd))completion;
@@ -250,4 +257,27 @@ typedef NS_OPTIONS(NSUInteger, iTermJobManagerAttachResults) {
                                                   jobManager:(id<iTermJobManager>)jobManager
                                                        queue:(dispatch_queue_t)queue;
 
+@end
+
+@interface PTYTask (Testing)
+- (BOOL)testHasReadSource;
+- (BOOL)testHasWriteSource;
+- (BOOL)testIsReadSourceSuspended;
+- (BOOL)testIsWriteSourceSuspended;
+- (BOOL)testWriteBufferHasData;
+- (void)testSetFd:(int)fd;
+- (void)testSetupDispatchSourcesForTesting;
+- (void)testTeardownDispatchSourcesForTesting;
+- (void)testAppendDataToWriteBuffer:(NSData *)data;
+- (void)testWaitForIOQueue;
+- (void)closeFileDescriptorAndDeregisterIfPossible;
+- (void)testSetJobManager:(id<iTermJobManager>)jobManager;
+- (BOOL)testHasCoprocessReadSource;
+- (BOOL)testHasCoprocessWriteSource;
+- (BOOL)testIsCoprocessReadSourceSuspended;
+- (BOOL)testIsCoprocessWriteSourceSuspended;
+- (void)testSetupCoprocessSourcesWithReadFd:(int)readFd writeFd:(int)writeFd;
+- (void)testTeardownCoprocessSources;
+@property (nonatomic) BOOL testShouldWriteOverride;
+@property (nonatomic, strong) NSNumber *testIoAllowedOverride;
 @end
