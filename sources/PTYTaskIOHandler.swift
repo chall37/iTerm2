@@ -104,15 +104,17 @@ private let kMaxReadWrite: Int = 1024
     /// Sources start suspended; updateReadSourceState/updateWriteSourceState
     /// resume them if conditions allow.
     @objc func start() {
-        // Read source — always active for EOF detection, even while paused.
-        // Data delivery is gated in handleReadEvent.
+        // Read source — starts suspended, resumed by updateReadSourceState when
+        // delegate says reading is allowed. Provides backpressure by suspending
+        // when the token pipeline is full.
         let rs = DispatchSource.makeReadSource(fileDescriptor: fd, queue: ioQueue)
         rs.setEventHandler { [weak self] in
             self?.handleReadEvent()
         }
-        rs.resume()
+        rs.resume()   // Must resume before we can suspend
+        rs.suspend()  // Start suspended
         readSource = rs
-        readSourceSuspended = false
+        readSourceSuspended = true
 
         // Write source
         let ws = DispatchSource.makeWriteSource(fileDescriptor: fd, queue: ioQueue)
@@ -166,11 +168,20 @@ private let kMaxReadWrite: Int = 1024
 
     // MARK: - State Updates (any queue)
 
-    /// No-op for read sources. The read source is always active so that EOF/broken-pipe
-    /// events are detected even while paused. Data delivery is gated in handleReadEvent.
+    /// Snapshots shouldRead from delegate, dispatches to ioQueue for source suspend/resume.
     @objc func updateReadSourceState() {
-        // Read source is never suspended. handleReadEvent checks shouldRead
-        // before delivering data, but always detects EOF.
+        guard let rs = readSource else { return }
+        let shouldRead = delegate?.ioHandlerShouldRead(self) ?? false
+        ioQueue.async { [weak self] in
+            guard let self else { return }
+            if shouldRead && self.readSourceSuspended && self.readSource != nil {
+                rs.resume()
+                self.readSourceSuspended = false
+            } else if !shouldRead && !self.readSourceSuspended && self.readSource != nil {
+                rs.suspend()
+                self.readSourceSuspended = true
+            }
+        }
     }
 
     /// Snapshots shouldWrite from delegate, dispatches to ioQueue for source suspend/resume.
@@ -294,27 +305,7 @@ private let kMaxReadWrite: Int = 1024
     // MARK: - Private Event Handlers (ioQueue)
 
     /// Read up to 4 * kMaxReadWrite bytes from the PTY fd per event.
-    /// Always detects EOF/broken-pipe even when paused. Data is only
-    /// delivered when shouldRead is true.
     private func handleReadEvent() {
-        let shouldRead = delegate?.ioHandlerShouldRead(self) ?? false
-        if !shouldRead {
-            // Paused or I/O disallowed. Probe for EOF without consuming data.
-            var pollFd = pollfd(fd: fd, events: Int16(POLLIN | POLLHUP), revents: 0)
-            let result = poll(&pollFd, 1, 0)
-            if result > 0 && (pollFd.revents & Int16(POLLHUP)) != 0 {
-                // Drain any remaining data before reporting EOF.
-                var buf = [CChar](repeating: 0, count: kMaxReadWrite)
-                while true {
-                    let n = Darwin.read(fd, &buf, kMaxReadWrite)
-                    if n <= 0 { break }
-                    delegate?.ioHandler(self, didReadData: &buf, length: Int32(n))
-                }
-                delegate?.ioHandlerDidDetectBrokenPipe(self)
-            }
-            return
-        }
-
         let iterations = 4
         let bufferSize = kMaxReadWrite * iterations
         let buffer = UnsafeMutablePointer<CChar>.allocate(capacity: bufferSize)
@@ -347,6 +338,8 @@ private let kMaxReadWrite: Int = 1024
 
         if totalBytesRead > 0 {
             delegate?.ioHandler(self, didReadData: buffer, length: Int32(totalBytesRead))
+            // Re-check state after read (backpressure may have increased)
+            updateReadSourceState()
         }
 
         if gotEOF {
