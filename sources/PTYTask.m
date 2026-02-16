@@ -885,7 +885,14 @@ static void HandleSigChld(int n) {
     if (self.paused) {
         return NO;
     }
-    return [self effectiveIoAllowed];
+    if (![self effectiveIoAllowed]) {
+        return NO;
+    }
+    iTermTokenExecutor *executor = (iTermTokenExecutor *)self.tokenExecutor;
+    if (executor && executor.backpressureLevel >= BackpressureLevelHeavy) {
+        return NO;
+    }
+    return YES;
 }
 
 - (BOOL)wantsWrite {

@@ -241,7 +241,7 @@ class TokenExecutor: NSObject {
                             semaphore: nil as DispatchSemaphore?)
             return
         }
-        // Normal code path for tokens from PTY. Use the semaphore to give backpressure to reading.
+        // Block on semaphore for backpressure to the reading thread (TaskNotifier or ioQueue).
         let semaphore = self.semaphore
         if enableTimingStats {
             TokenExecutor.addTokensTimingStats.recordEnd()
@@ -309,10 +309,12 @@ class TokenExecutor: NSObject {
                                  lengthExcludingInBandSignaling: Int,
                                  highPriority: Bool,
                                  semaphore: DispatchSemaphore?) {
-        // When semaphore is signaled (slot released), increment the available slots counter
-        // and notify if backpressure has eased
+        // When a slot is released (token array consumed), increment the available slots counter
+        // and notify if backpressure has eased. This fires for all non-high-priority tokens
+        // regardless of whether a semaphore is used (legacy path) or not (dispatch sources path).
+        // High-priority tokens bypass backpressure accounting entirely.
         let onSemaphoreSignaled: (() -> Void)?
-        if semaphore != nil {
+        if !highPriority {
             onSemaphoreSignaled = { [weak self, availableSlots] in
                 guard let self = self else { return }
                 let newValue = iTermAtomicInt64Add(availableSlots, 1)
