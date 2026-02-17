@@ -27,7 +27,7 @@ func makeStyleChar(letter: UInt16) -> screen_char_t {
     style.underline = 1
     style.image = 0
     style.strikethrough = 1
-    ScreenCharSetUnderlineStyle(&style, .single)
+    style.underlineStyle = .single
     style.invisible = 0
     style.inverse = 1
     style.guarded = 0
