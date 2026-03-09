@@ -786,10 +786,22 @@ static int iTermLineBlockNumberOfFullLinesImpl(const screen_char_t *buffer,
             continuation:(screen_char_t)continuation
                     cert:(id<iTermLineBlockMutationCertificate>)cert {
     _numberOfFullLinesCache.clear();
-    const int space_used = [self rawSpaceUsed];
-    const int free_space = _characterBuffer.size - space_used - self.bufferStartOffset;
+    int space_used = [self rawSpaceUsed];
+    int free_space = _characterBuffer.size - space_used - self.bufferStartOffset;
     if (length > free_space) {
-        return NO;
+        // Special case: if we're appending a partial line to a block that contains
+        // only one partial line, resize the buffer instead of failing. This allows
+        // incremental merge to work by keeping _appendOnlySinceLastCopy = YES.
+        // Without this optimization, LineBuffer would pop the line and reappend it,
+        // which sets _appendOnlySinceLastCopy = NO.
+        if (partial && is_partial && cll_entries == _firstEntry + 1 && _firstEntry == 0 && self.bufferStartOffset == 0) {
+            const int newCapacity = space_used + length;
+            [self changeBufferSize:newCapacity cert:cert];
+            // Recalculate free space after resize
+            free_space = _characterBuffer.size - space_used - self.bufferStartOffset;
+        } else {
+            return NO;
+        }
     }
     // A line block could hold up to maxint empty lines but that makes
     // -dictionary return a very large serialized state.
@@ -814,6 +826,11 @@ static int iTermLineBlockNumberOfFullLinesImpl(const screen_char_t *buffer,
     if (is_partial && !(!partial && length == 0)) {
         // append to an existing line
         ITAssertWithMessage(cll_entries > 0, @"is_partial but has no entries");
+        // If completing the line (hard EOL), invalidate incremental merge eligibility
+        // since the copy will still think it's partial.
+        if (!partial) {
+            _appendOnlySinceLastCopy = NO;
+        }
         // update the numlines cache with the new number of full lines that the updated line has.
         if (width != cached_numlines_width) {
             cached_numlines_width = -1;
@@ -846,6 +863,7 @@ static int iTermLineBlockNumberOfFullLinesImpl(const screen_char_t *buffer,
 #endif
     } else {
         // add a new line
+        _appendOnlySinceLastCopy = NO;
         didFindRTL = lineMetadata.rtlFound;
         [self _appendCumulativeLineLength:(space_used + length)
                                  metadata:lineMetadata
@@ -1488,6 +1506,7 @@ int OffsetOfWrappedLine(const screen_char_t* p, int n, int length, int width, BO
 }
 
 - (void)removeLastRawLine {
+    _appendOnlySinceLastCopy = NO;
     if (cll_entries == _firstEntry) {
         return;
     }
@@ -1535,6 +1554,7 @@ int OffsetOfWrappedLine(const screen_char_t* p, int n, int length, int width, BO
                      metadata:(out iTermImmutableMetadata *)metadataPtr
                  continuation:(screen_char_t *)continuationPtr
                          cert:(id<iTermLineBlockMutationCertificate>)cert {
+    _appendOnlySinceLastCopy = NO;
     if (cll_entries == _firstEntry) {
         // There is no last line to pop.
         return NO;
@@ -1729,8 +1749,8 @@ int OffsetOfWrappedLine(const screen_char_t* p, int n, int length, int width, BO
 }
 
 - (int)offsetOfRawLine:(int)linenum {
-    if (linenum == 0) {
-        return 0;
+    if (linenum == _firstEntry) {
+        return self.bufferStartOffset;
     } else {
         return cumulative_line_lengths[linenum - 1];
     }
@@ -1746,8 +1766,8 @@ int OffsetOfWrappedLine(const screen_char_t* p, int n, int length, int width, BO
 
 - (const screen_char_t*)rawLine:(int)linenum {
     int start;
-    if (linenum == 0) {
-        start = 0;
+    if (linenum == _firstEntry) {
+        start = self.bufferStartOffset;
     } else {
         start = cumulative_line_lengths[linenum - 1];
     }
@@ -1793,6 +1813,7 @@ int OffsetOfWrappedLine(const screen_char_t* p, int n, int length, int width, BO
     if (partial == is_partial) {
         return;
     }
+    _appendOnlySinceLastCopy = NO;
     is_partial = partial;
     iTermLineBlockDidChange(self, "set partial");
 }
@@ -1811,6 +1832,7 @@ int OffsetOfWrappedLine(const screen_char_t* p, int n, int length, int width, BO
 }
 
 - (int)dropLines:(int)orig_n withWidth:(int)width chars:(int *)charsDropped {
+    _appendOnlySinceLastCopy = NO;
     // Note that there's no mutation certificate because we aren't touching the character buffer.
     [_metadataArray willMutate];
 
@@ -1950,6 +1972,106 @@ int OffsetOfWrappedLine(const screen_char_t* p, int n, int length, int width, BO
     }
     // Mutating an object nils its owner and points its clients at a different or nil owner.
     return _progenitor == _owner;
+}
+
+- (BOOL)appendOnlySinceLastCopy {
+    return _appendOnlySinceLastCopy;
+}
+
+- (BOOL)canIncrementalMergeFromProgenitor {
+    if (!_progenitor || _progenitor.invalidated) {
+        return NO;
+    }
+    // If copy has diverged (was mutated), we can't do incremental merge
+    // because its buffer no longer matches the sync-time state.
+    if (_hasDiverged) {
+        return NO;
+    }
+    if (!_progenitor->_appendOnlySinceLastCopy) {
+        return NO;
+    }
+    // Both must have exactly one raw line, both partial, no drops
+    if (cll_entries != _firstEntry + 1 ||
+        _progenitor->cll_entries != _progenitor->_firstEntry + 1) {
+        return NO;
+    }
+    if (!is_partial || !_progenitor->is_partial) {
+        return NO;
+    }
+    if (_firstEntry != 0 || self.bufferStartOffset != 0) {
+        return NO;
+    }
+    // Progenitor must have grown
+    const int progenitorLen = _progenitor->cumulative_line_lengths[_progenitor->_firstEntry] - _progenitor.bufferStartOffset;
+    const int myLen = cumulative_line_lengths[_firstEntry] - self.bufferStartOffset;
+    return progenitorLen > myLen;
+}
+
+- (void)incrementalMergeFromProgenitor {
+    std::lock_guard<std::recursive_mutex> lock(gLineBlockMutex);
+
+    LineBlock *progenitor = _progenitor;
+    const int progenitorLen = progenitor->cumulative_line_lengths[progenitor->_firstEntry] - progenitor.bufferStartOffset;
+    const int myLen = cumulative_line_lengths[_firstEntry] - self.bufferStartOffset;
+    const int appendedLen = progenitorLen - myLen;
+
+    // Get private buffers (clones OLD shared state = data at sync point)
+    id<iTermLineBlockMutationCertificate> cert = [self validMutationCertificate];
+
+    // Resize if needed
+    if (_characterBuffer.size < progenitorLen) {
+        [cert setRawBufferCapacity:progenitorLen];
+    }
+
+    // Copy only appended characters
+    memcpy(cert.mutableRawBuffer + myLen,
+           progenitor->_characterBuffer.pointer + progenitor.bufferStartOffset + myLen,
+           appendedLen * sizeof(screen_char_t));
+
+    // Update cumulative line length
+    cert.mutableCumulativeLineLengths[_firstEntry] = progenitorLen;
+
+    // Sync metadata from progenitor
+    // We need to extract the metadata for just the appended portion.
+    // The progenitor's metadata covers the entire line; we need to sync:
+    // - timestamp (use progenitor's current timestamp)
+    // - rtlFound (OR with progenitor's flag)
+    // - externalAttributes (extract slice for appended range)
+    // - continuation (use progenitor's current continuation)
+    [_metadataArray willMutate];
+    const LineBlockMetadata *progenitorMeta = [progenitor->_metadataArray metadataAtIndex:progenitor->_firstEntry];
+
+    // Create metadata for the appended portion by extracting from progenitor
+    iTermImmutableMetadata progenitorLineMeta = iTermMetadataMakeImmutable(progenitorMeta->lineMetadata);
+
+    // Extract external attributes for just the appended range [myLen, progenitorLen)
+    iTermMetadata appendedMeta;
+    iTermMetadataInitCopyingSubrange(&appendedMeta, &progenitorLineMeta, myLen, appendedLen);
+    iTermImmutableMetadata immutableAppendedMeta = iTermMetadataMakeImmutable(appendedMeta);
+
+    // Merge metadata using appendToLastLine which handles:
+    // - timestamp update
+    // - rtlFound OR
+    // - external attributes concatenation with position adjustment
+    // - continuation update
+    // - Cache invalidation (number_of_wrapped_lines=0, DWC cache=nil, bidi_info=nil)
+    [_metadataArray appendToLastLine:&immutableAppendedMeta
+                      originalLength:myLen
+                    additionalLength:appendedLen
+                        continuation:progenitorMeta->continuation];
+
+    iTermMetadataRelease(appendedMeta);
+
+    // Invalidate caches that appendToLastLine doesn't handle
+    _numberOfFullLinesCache.clear();
+    cached_numlines_width = -1;  // Force recomputation of wrapped line count
+
+    // Sync DWC flag (sticky - once set, stays set)
+    if (progenitor->_mayHaveDoubleWidthCharacter) {
+        _mayHaveDoubleWidthCharacter = YES;
+    }
+
+    iTermLineBlockDidChange(self, "incremental merge");
 }
 
 - (int)_lineRawOffset:(int) anIndex {
@@ -2622,6 +2744,10 @@ crossBlockResultCount:(NSInteger *)crossBlockResultCount {
         iTermAssignToConstPointer((void **)&cumulative_line_lengths, iTermMemdup(self->cumulative_line_lengths, cll_capacity, sizeof(int)));
 
         if (self.owner != nil) {
+            // This copy is diverging from its progenitor by mutating.
+            // Mark it so incremental merge knows not to use it.
+            _hasDiverged = YES;
+
             // I am no longer a client. Remove myself from my owner's client list.
             [self.owner.clients removeObjectsPassingTest:^BOOL(id block) {
                 return block == self;
@@ -2681,6 +2807,9 @@ crossBlockResultCount:(NSInteger *)crossBlockResultCount {
     [(id<iTermLineBlockMutationCertificate>)_cachedMutationCert invalidate];
     _cachedMutationCert = nil;
     copy->_progenitor = self;
+
+    // Reset append tracking - new copies start clean
+    _appendOnlySinceLastCopy = YES;
 
     return copy;
 }

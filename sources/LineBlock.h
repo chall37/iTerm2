@@ -283,6 +283,12 @@ void EnableDoubleWidthCharacterLineCache(void);
 - (void)invalidate;
 - (NSInteger)sizeFromLine:(int)lineNum width:(int)width;
 
+// Incremental merge support: returns YES if the progenitor's only mutations since this
+// cowCopy were partial-line appends, enabling an optimized merge that copies only the delta.
+@property(nonatomic, readonly) BOOL appendOnlySinceLastCopy;
+@property(nonatomic, readonly) BOOL canIncrementalMergeFromProgenitor;
+- (void)incrementalMergeFromProgenitor;
+
 - (id)copy NS_UNAVAILABLE;
 - (id)copyWithZone:(nullable NSZone *)zone NS_UNAVAILABLE;
 - (LineBlock *)cowCopy;

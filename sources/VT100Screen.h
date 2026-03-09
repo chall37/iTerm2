@@ -7,6 +7,7 @@
 #import "PTYAnnotation.h"
 #import "PTYTextViewDataSource.h"
 #import "PTYTriggerEvaluator.h"
+#import "Trigger.h"
 #import "SCPPath.h"
 #import "ScreenCharArray.h"
 #import "VT100ScreenDelegate.h"
@@ -51,7 +52,10 @@ extern const NSInteger VT100ScreenBigFileDownloadThreshold;
 
 @interface VT100Screen : NSObject <
     PTYTextViewDataSource,
-    PTYTriggerEvaluatorDataSource>
+    PTYTriggerEvaluatorDataSource,
+    iTermTriggerSession,
+    iTermTriggerScopeProvider,
+    iTermTriggerCallbackScheduler>
 
 @property(nonatomic) BOOL terminalEnabled;
 @property(atomic, weak) id<VT100ScreenDelegate> delegate;
@@ -186,6 +190,8 @@ extern const NSInteger VT100ScreenBigFileDownloadThreshold;
 - (id<VT100ScreenMarkReading>)commandMarkAtOrBeforeLine:(int)line;
 - (id<VT100ScreenMarkReading>)screenMarkAfterScreenMark:(id<VT100ScreenMarkReading>)predecessor;
 - (id<VT100ScreenMarkReading>)promptMarkAfterScreenMark:(id<VT100ScreenMarkReading>)predecessor;
+- (id<VT100ScreenMarkReading>)firstCommandMarkWithCommandInRange:(NSRange)absLineRange;
+- (id<VT100ScreenMarkReading>)lastCommandMarkWithCommandInRange:(NSRange)absLineRange;
 
 - (BOOL)containsMark:(id<iTermMark>)mark;
 - (void)clearToLastMark;
@@ -213,7 +219,7 @@ extern const NSInteger VT100ScreenBigFileDownloadThreshold;
 - (void)enumerateLinesInRange:(NSRange)range block:(void (^)(int line, ScreenCharArray *, iTermImmutableMetadata, BOOL *))block;
 
 - (void)enumerateObservableMarks:(void (^ NS_NOESCAPE)(iTermIntervalTreeObjectType, NSInteger, id<IntervalTreeObject>))block;
-- (void)setColorsFromDictionary:(NSDictionary<NSNumber *, id> *)dict;
+- (void)setColorsFromDictionary:(NSDictionary<NSNumber *, id> *)dict harmonize:(BOOL)harmonize;
 - (void)setColor:(NSColor *)color forKey:(int)key;
 - (void)userDidPressReturn;
 
@@ -279,5 +285,10 @@ typedef NS_ENUM(NSUInteger, VT100ScreenTriggerCheckType) {
 - (NSString *)wordBefore:(VT100GridCoord)coord
 additionalWordCharacters:(NSString *)additionalWordCharacters
                    range:(VT100GridWindowedRange *)rangePtr;
+
+// Fire an event trigger action. Must be called on the main queue.
+- (void)fireEventTrigger:(Trigger *)trigger
+         capturedStrings:(NSArray<NSString *> *)capturedStrings
+        useInterpolation:(BOOL)useInterpolation;
 
 @end

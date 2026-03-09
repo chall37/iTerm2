@@ -249,7 +249,7 @@ typedef NS_ENUM(NSUInteger, iTermSessionViewFindDriver) {
 + (NSDate*)lastResizeDate;
 + (void)windowDidResize;
 
-- (void)setMetalViewNeedsDisplayInTextViewRect:(NSRect)textViewRect NS_AVAILABLE_MAC(10_11);
+- (void)requestRedraw;
 
 - (void)setDimmed:(BOOL)isDimmed;
 - (void)setBackgroundDimmed:(BOOL)backgroundDimmed;

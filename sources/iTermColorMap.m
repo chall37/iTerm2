@@ -617,6 +617,7 @@ const int kColorMapAnsiBrightModifier = 8;
     other->_useSeparateColorsForLightAndDarkMode = _useSeparateColorsForLightAndDarkMode;
     other->_darkMode = _darkMode;
     other->_faintTextAlpha = _faintTextAlpha;
+    other->_harmonize = _harmonize;
 
     return other;
 }
@@ -758,6 +759,7 @@ const int kColorMapAnsiBrightModifier = 8;
 @dynamic useSeparateColorsForLightAndDarkMode;
 @dynamic darkMode;
 @dynamic generation;
+@dynamic harmonize;
 
 - (instancetype)initWithSource:(iTermColorMap *)source {
     _impl = [[iTermColorMapSanitizingAdapterImpl alloc] initWithSource:source];

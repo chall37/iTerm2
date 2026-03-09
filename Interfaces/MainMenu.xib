@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="24127" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES">
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="24506" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES">
     <dependencies>
         <deployment identifier="macosx"/>
-        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="24127"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="24506"/>
     </dependencies>
     <objects>
         <customObject id="-2" userLabel="File's Owner" customClass="NSApplication">
@@ -311,6 +311,12 @@
                                         </menuItem>
                                     </items>
                                 </menu>
+                            </menuItem>
+                            <menuItem title="Toggle Buffer Input" identifier="Toggle Buffer Input" id="Irq-lZ-Iy6">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="toggleBufferInput:" target="-1" id="KoY-ZU-t1e"/>
+                                </connections>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="1307">
                                 <modifierMask key="keyEquivalentModifierMask" command="YES"/>
@@ -846,6 +852,12 @@ DQ
                                     <action selector="foldSelection:" target="-1" id="hgD-pz-qFa"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Fold All" keyEquivalent="L" identifier="Fold All Above Cursor" id="fAC-xy-123">
+                                <modifierMask key="keyEquivalentModifierMask" shift="YES" option="YES" command="YES"/>
+                                <connections>
+                                    <action selector="foldAll:" target="-1" id="fAC-cn-456"/>
+                                </connections>
+                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="Tkg-kg-CnW">
                                 <modifierMask key="keyEquivalentModifierMask" command="YES"/>
                                 <menu key="submenu" id="Sgf-ct-nyp">
@@ -1061,6 +1073,17 @@ DQ
                                 <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
                                 <connections>
                                     <action selector="irPrev:" target="-1" id="982"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="zLk-Jm-8pQ">
+                                <modifierMask key="keyEquivalentModifierMask" command="YES"/>
+                            </menuItem>
+                            <menuItem title="Always Show Alerts with Remembered Selections" identifier="Always Show Alerts with Remembered Selections" id="fRa-4w-9Nh">
+                                <string key="keyEquivalent" base64-UTF8="YES">
+CQ
+</string>
+                                <connections>
+                                    <action selector="toggleShowAlertsWithRememberedSelections:" target="201" id="gKp-3x-7Lm"/>
                                 </connections>
                             </menuItem>
                         </items>

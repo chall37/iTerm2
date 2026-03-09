@@ -2192,10 +2192,22 @@ NS_INLINE int TotalNumberOfRawLines(LineBuffer *self) {
         stage1 = [_lineBlocks dumpWidths:commonWidths];
     }
 
-    // Drop blocks from the end until we get to one that is in sync.
+    // Drop blocks from the end until we get to one that is in sync or can be incrementally merged.
     // Note that if the first block has experienced drops but not appends then it will still have
     // its progenitor as its owner and be considered "synchronized".
-    while (_lineBlocks.count > 0 && ![_lineBlocks.lastBlock isSynchronizedWithProgenitor]) {
+    while (_lineBlocks.count > 0) {
+        LineBlock *lastBlock = _lineBlocks.lastBlock;
+
+        if ([lastBlock isSynchronizedWithProgenitor]) {
+            break;  // Already in sync
+        }
+
+        if ([lastBlock canIncrementalMergeFromProgenitor]) {
+            DLog(@"incremental merge");
+            [lastBlock incrementalMergeFromProgenitor];
+            break;  // Now caught up
+        }
+
         DLog(@"remove last");
         [_lineBlocks removeLastBlock];
     }

@@ -13,7 +13,7 @@ class BufferInputTrigger: Trigger {
         case stop = 1
     }
 
-    private var shouldBuffer: Bool {
+    @objc var shouldBuffer: Bool {
         switch Tag(rawValue: (self.param as? NSNumber)?.intValue ?? 0) {
         case .none, .start:
             return true
@@ -35,6 +35,13 @@ class BufferInputTrigger: Trigger {
 
     override func takesParameter() -> Bool {
         return true
+    }
+
+    // Requires a live session to buffer input
+    override var allowedMatchTypes: Set<NSNumber> {
+        var set: Set<NSNumber> = [NSNumber(value: iTermTriggerMatchType.regex.rawValue)]
+        set.formUnion(EventTriggerMatchTypeHelper.allEventTypesExceptSessionEndedSet)
+        return set
     }
 
     override func paramIsPopupButton() -> Bool {

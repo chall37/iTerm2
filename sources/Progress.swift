@@ -46,9 +46,8 @@ class Progress: NSObject {
                                        closure: closure,
                                        queue: queue))
         }
-        weak var weakOwner: AnyObject? = owner
-        queue.async { [weak self] in
-            if let self, weakOwner != nil {
+        queue.async { [weak self, weak owner] in
+            if let self, owner != nil {
                 closure(self._value.value)
             }
         }

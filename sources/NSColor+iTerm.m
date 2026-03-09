@@ -130,6 +130,26 @@ iTermLABColor iTermLABFromSRGB(iTermSRGBColor srgb) {
     };
 }
 
+iTermP3Color iTermP3FromLAB(iTermLABColor lab) {
+    const CGFloat tempY = (lab.l + 16.0) / 116.0;
+
+    iTermXYZColor xyz = {
+        .x = lab.a / 500.0 + tempY,
+        .y = tempY,
+        .z = tempY - lab.b / 200.0
+    };
+
+    xyz = iTermLinearizeXYZ(xyz);
+
+    const iTermXYZColor reference = iTermD65Reference();
+
+    xyz.x *= reference.x;
+    xyz.y *= reference.y;
+    xyz.z *= reference.z;
+
+    return iTermXYZToP3(xyz);
+}
+
 iTermSRGBColor iTermSRGBFromLAB(iTermLABColor lab) {
     const CGFloat tempY = (lab.l + 16.0) / 116.0;
     iTermXYZColor xyz = {
@@ -633,8 +653,8 @@ iTermP3Color iTermSRGBColorToP3Color(iTermSRGBColor srgb) {
     result[3] = a;
 }
 
-+ (NSColor *)colorForAnsi256ColorIndex:(int)index {
-    double r, g, b;
++ (iTermRGBColor)rgbColorForAnsi256ColorIndex:(int)index {
+    CGFloat r, g, b;
     if (index >= 16 && index < 232) {
         int i = index - 16;
         r = (i / 36) ? ((i / 36) * 40 + 55) / 255.0 : 0.0;
@@ -645,17 +665,25 @@ iTermP3Color iTermSRGBColorToP3Color(iTermSRGBColor srgb) {
         r = g = b = (i * 10 + 8) / 255.0;
     } else {
         // The first 16 colors aren't supported here.
+        return (iTermRGBColor){ -1, -1, -1 };
+    }
+    return (iTermRGBColor){ r, g, b };
+}
+
++ (NSColor *)colorForAnsi256ColorIndex:(int)index {
+    iTermRGBColor rgb = [self rgbColorForAnsi256ColorIndex:index];
+    if (rgb.r < 0) {
         return nil;
     }
     if ([iTermAdvancedSettingsModel p3]) {
-        return [NSColor colorWithDisplayP3Red:r
-                                        green:g
-                                         blue:b
+        return [NSColor colorWithDisplayP3Red:rgb.r
+                                        green:rgb.g
+                                         blue:rgb.b
                                         alpha:1];
     } else {
-        NSColor* srgb = [NSColor colorWithSRGBRed:r
-                                            green:g
-                                             blue:b
+        NSColor* srgb = [NSColor colorWithSRGBRed:rgb.r
+                                            green:rgb.g
+                                             blue:rgb.b
                                             alpha:1];
         return [srgb colorUsingColorSpace:[NSColorSpace genericRGBColorSpace]];
     }

@@ -203,6 +203,7 @@ extern const CGFloat PTYTextViewMarginClickGraceWidth;
 - (BOOL)textViewSessionIsLinkedToAIChat;
 - (BOOL)textViewSessionIsStreamingToAIChat;
 - (BOOL)textViewSessionHasChannelParent;
+- (BOOL)textViewIsBufferingInput;
 
 // Is it possible to restart this session?
 - (BOOL)isRestartable;
@@ -345,6 +346,7 @@ extern const CGFloat PTYTextViewMarginClickGraceWidth;
 - (BOOL)textViewPerformTextReplacement;
 - (void)textViewSaveArchive:(iTermSavePanelItem *)location;
 - (void)textViewSendCustomButtonCode:(int)code;
+- (void)textViewToggleBufferInput;
 @end
 
 @interface iTermHighlightedRow : NSObject

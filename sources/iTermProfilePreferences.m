@@ -294,6 +294,10 @@ typedef struct {
             KEY_BRIGHTEN_BOLD_TEXT COLORS_LIGHT_MODE_SUFFIX,
             KEY_BRIGHTEN_BOLD_TEXT COLORS_DARK_MODE_SUFFIX,
 
+            KEY_HARMONIZE_256_COLORS,
+            KEY_HARMONIZE_256_COLORS COLORS_LIGHT_MODE_SUFFIX,
+            KEY_HARMONIZE_256_COLORS COLORS_DARK_MODE_SUFFIX,
+
             KEY_BLINK_ALLOWED, KEY_USE_ITALIC_FONT, KEY_AMBIGUOUS_DOUBLE_WIDTH,
             KEY_USE_NONASCII_FONT, KEY_INITIAL_USE_TRANSPARENCY, KEY_BLUR,
             KEY_DISABLE_WINDOW_RESIZING, KEY_DISABLE_UNFOCUSED_WINDOW_RESIZING,
@@ -313,7 +317,7 @@ typedef struct {
             KEY_RESTRICT_MOUSE_REPORTING_TO_ALTERNATE_SCREEN_MODE,
             KEY_ALLOW_TITLE_SETTING,
             KEY_DISABLE_PRINTING, KEY_DISABLE_SMCUP_RMCUP, KEY_SILENCE_BELL,
-            KEY_DEFAULT_PANE_LOCKED,
+            KEY_DEFAULT_PANE_LOCKED, KEY_BUFFER_BY_DEFAULT,
 
             KEY_BOOKMARK_USER_NOTIFICATIONS, KEY_SEND_BELL_ALERT, KEY_SEND_IDLE_ALERT,
             KEY_SEND_NEW_OUTPUT_ALERT, KEY_SEND_SESSION_ENDED_ALERT,
@@ -599,6 +603,8 @@ typedef struct {
             KEY_USE_BOLD_COLOR COLORS_DARK_MODE_SUFFIX:             @"Whether to use a separate color for bold text in dark mode",
             KEY_BRIGHTEN_BOLD_TEXT COLORS_LIGHT_MODE_SUFFIX:        @"Whether to brighten bold text in light mode",
             KEY_BRIGHTEN_BOLD_TEXT COLORS_DARK_MODE_SUFFIX:         @"Whether to brighten bold text in dark mode",
+            KEY_HARMONIZE_256_COLORS COLORS_LIGHT_MODE_SUFFIX:      @"Whether 8-bit colors should be picked to match well with ANSI colors in light mode",
+            KEY_HARMONIZE_256_COLORS COLORS_DARK_MODE_SUFFIX:       @"Whether 8-bit colors should be picked to match well with ANSI colors in dark mode",
 
             KEY_NAME:                                               @"Profile name",
             KEY_SHORTCUT:                                           @"Keyboard shortcut character for ⌃⌘ profile access",
@@ -667,6 +673,7 @@ typedef struct {
             KEY_NON_ASCII_LIGATURES:                                @"Whether to render ligatures in non-ASCII text",
             KEY_USE_BOLD_COLOR:                                     @"Whether to use a separate color for bold text",
             KEY_BRIGHTEN_BOLD_TEXT:                                 @"Whether to brighten bold text",
+            KEY_HARMONIZE_256_COLORS:                               @"Whether 8-bit colors should be picked to match well with ANSI colors",
             KEY_BLINK_ALLOWED:                                      @"Whether blinking text is allowed",
             KEY_USE_ITALIC_FONT:                                    @"Whether to use italic font for italic text",
             KEY_AMBIGUOUS_DOUBLE_WIDTH:                             @"Whether to treat ambiguous-width characters as double-width",
@@ -725,6 +732,7 @@ typedef struct {
             KEY_DISABLE_SMCUP_RMCUP:                                @"Whether to disable alternate screen mode switching",
             KEY_SILENCE_BELL:                                       @"Whether to silence the terminal bell",
             KEY_DEFAULT_PANE_LOCKED:                                @"Whether new panes are locked by default",
+            KEY_BUFFER_BY_DEFAULT:                                  @"Whether keyboard input should be buffered by default in new sessions",
             KEY_BOOKMARK_USER_NOTIFICATIONS:                        @"Whether to post user notifications for this profile",
             KEY_SEND_BELL_ALERT:                                    @"Whether to send notification when bell rings",
             KEY_SEND_IDLE_ALERT:                                    @"Whether to send notification when session becomes idle",
@@ -993,7 +1001,11 @@ typedef struct {
                   KEY_BRIGHTEN_BOLD_TEXT: @YES,
                   KEY_BRIGHTEN_BOLD_TEXT COLORS_LIGHT_MODE_SUFFIX: @YES,
                   KEY_BRIGHTEN_BOLD_TEXT COLORS_DARK_MODE_SUFFIX: @YES,
-                  
+
+                  KEY_HARMONIZE_256_COLORS: @NO,
+                  KEY_HARMONIZE_256_COLORS COLORS_LIGHT_MODE_SUFFIX: @NO,
+                  KEY_HARMONIZE_256_COLORS COLORS_DARK_MODE_SUFFIX: @NO,
+
                   KEY_BLINK_ALLOWED: @NO,
                   KEY_USE_ITALIC_FONT: @YES,
                   KEY_AMBIGUOUS_DOUBLE_WIDTH: @NO,
@@ -1054,6 +1066,7 @@ typedef struct {
                   KEY_DISABLE_SMCUP_RMCUP: @NO,
                   KEY_SILENCE_BELL: @NO,
                   KEY_DEFAULT_PANE_LOCKED: @NO,
+                  KEY_BUFFER_BY_DEFAULT: @NO,
                   KEY_BOOKMARK_USER_NOTIFICATIONS: @NO,
                   KEY_SEND_BELL_ALERT: @YES,
                   KEY_SEND_IDLE_ALERT: @NO,

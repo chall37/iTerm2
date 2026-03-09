@@ -69,6 +69,8 @@ iTermSRGBColor iTermCompressRGB(iTermRGBColor rgb);
 iTermLABColor iTermLABFromSRGB(iTermSRGBColor srgb);
 iTermSRGBColor iTermSRGBFromLAB(iTermLABColor lab);
 
+iTermP3Color iTermP3FromLAB(iTermLABColor lab);
+
 // Based on Rec. 709 standard
 CGFloat iTermPerceptualBrightnessSRGB(iTermSRGBColor srgb);
 
@@ -146,6 +148,7 @@ CGFloat PerceivedBrightness(CGFloat r, CGFloat g, CGFloat b);
 // Returns colors for the standard 8-bit ansi color codes. Only indices between 16 and 255 are
 // supported.
 + (NSColor * _Nullable)colorForAnsi256ColorIndex:(int)index;
++ (iTermRGBColor)rgbColorForAnsi256ColorIndex:(int)index;
 
 - (NSColor *)colorDimmedBy:(double)dimmingAmount towardsGrayLevel:(double)grayLevel;
 

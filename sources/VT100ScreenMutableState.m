@@ -1130,8 +1130,7 @@ static const int64_t VT100ScreenMutableStateSideEffectFlagLineBufferDidDropLines
             DLog( @"Scroll down by yet more: %@", @(marginalDelta));
             [self.currentGrid scrollRect:VT100GridRectMake(0, 0, self.width, self.height)
                                   downBy:marginalDelta
-                               softBreak:NO
-                                fillChar:(screen_char_t){0}];
+                               softBreak:NO];
         }
         [self shiftIntervalTreeObjectsInRange:VT100GridCoordRangeMake(0,
                                                                       0,
@@ -4368,6 +4367,35 @@ void VT100ScreenEraseCell(screen_char_t *sct,
     const long long newLength = replacementLines.count;
     const long long delta = newLength - originalLength;
     [self shiftCommandRangesBelowAbsLine:absRange.start.y + 1 by:delta];
+
+    // Also adjust absolute coordinate state that tracks the current command/prompt.
+    // These are separate from the command ranges stored in marks.
+    if (self.commandStartCoord.x >= 0 && self.commandStartCoord.y > absRange.start.y) {
+        VT100GridAbsCoord newCoord = self.commandStartCoord;
+        newCoord.y += delta;
+        self.commandStartCoord = newCoord;
+    }
+    if (self.currentPromptRange.start.x >= 0 && self.currentPromptRange.start.y > absRange.start.y) {
+        VT100GridAbsCoordRange newRange = self.currentPromptRange;
+        newRange.start.y += delta;
+        newRange.end.y += delta;
+        self.currentPromptRange = newRange;
+    }
+    if (self.startOfRunningCommandOutput.x >= 0 && self.startOfRunningCommandOutput.y > absRange.start.y) {
+        VT100GridAbsCoord newCoord = self.startOfRunningCommandOutput;
+        newCoord.y += delta;
+        self.startOfRunningCommandOutput = newCoord;
+    }
+    if (self.lastCommandOutputRange.start.x >= 0 && self.lastCommandOutputRange.start.y > absRange.start.y) {
+        VT100GridAbsCoordRange newRange = self.lastCommandOutputRange;
+        newRange.start.y += delta;
+        newRange.end.y += delta;
+        self.lastCommandOutputRange = newRange;
+    }
+    if (self.lastPromptLine > absRange.start.y) {
+        self.lastPromptLine += delta;
+    }
+
     [self reloadMarkCache];
 
     [self.linebuffer setMaxLines:savedMaxLines];
@@ -4584,6 +4612,7 @@ lengthExcludingInBandSignaling:lengthExcludingInBandSignaling
         lengthTotal:data.length
 lengthExcludingInBandSignaling:data.length
        highPriority:YES];
+    [self scheduleTokenExecution];
 }
 
 #pragma mark - Triggers
@@ -4690,15 +4719,91 @@ lengthExcludingInBandSignaling:data.length
 
 - (void)loadInitialColorTable {
     [self mutateColorMap:^(iTermColorMap *colorMap) {
-        for (int i = 16; i < 256; i++) {
-            NSColor *theColor = [NSColor colorForAnsi256ColorIndex:i];
-            [colorMap setColor:theColor forKey:kColorMap8bitBase + i];
+        if (colorMap.harmonize) {
+            [self setHarmonious256ColorsInColorMap:colorMap];
+        } else {
+            [self setStandard256ColorsInColorMap:colorMap];
         }
     }];
 }
 
-- (void)setColorsFromDictionary:(NSDictionary<NSNumber *, id> *)dict {
+// https://gist.github.com/jake-stewart/0a8ea46159a7da2c808e5be2177e1783
+- (void)setHarmonious256ColorsInColorMap:(iTermColorMap *)colorMap {
+    iTermLABColor (^lerp_lab)(CGFloat, iTermLABColor, iTermLABColor) = ^iTermLABColor(CGFloat t, iTermLABColor lab1, iTermLABColor lab2) {
+        return (iTermLABColor){
+            .l = lab1.l + t * (lab2.l - lab1.l),
+            .a = lab1.a + t * (lab2.a - lab1.a),
+            .b = lab1.b + t * (lab2.b - lab1.b),
+        };
+    };
+
+    NSColorSpace *srgbColorSpace = [NSColorSpace sRGBColorSpace];
+    iTermLABColor (^labForKey)(int) = ^iTermLABColor(int i) {
+        const vector_float4 c = [colorMap fastColorForKey:i colorSpace:srgbColorSpace];
+        const iTermSRGBColor srgb = {
+            .r = c.x,
+            .g = c.y,
+            .b = c.z,
+        };
+        return iTermLABFromSRGB(srgb);
+    };
+    iTermLABColor base8_lab[8];
+    for (int i = 0; i < 8; i++) {
+        base8_lab[i] = labForKey(kColorMapAnsiBlack + i);
+    }
+
+    const iTermLABColor bg_lab = labForKey(kColorMapBackground);
+    const iTermLABColor fg_lab = labForKey(kColorMapForeground);
+
+    const BOOL shouldUseP3 = [iTermAdvancedSettingsModel p3];
+    NSColor *(^labToRGB)(iTermLABColor) = ^NSColor *(iTermLABColor lab) {
+        if (shouldUseP3) {
+            iTermP3Color p3Color = iTermP3FromLAB(lab);
+            return [NSColor colorWithDisplayP3Red:p3Color.r green:p3Color.g blue:p3Color.b alpha:1];
+        } else {
+            const iTermSRGBColor srgb = iTermSRGBFromLAB(lab);
+            return [NSColor colorWithSRGBRed:srgb.r green:srgb.g blue:srgb.b alpha:1];
+        }
+    };
+
+    int di = kColorMap8bitBase + 16;
+    for (CGFloat r = 0; r < 6; r += 1.0) {
+        const iTermLABColor c0 = lerp_lab(r / 5, bg_lab, base8_lab[1]);
+        const iTermLABColor c1 = lerp_lab(r / 5, base8_lab[2], base8_lab[3]);
+        const iTermLABColor c2 = lerp_lab(r / 5, base8_lab[4], base8_lab[5]);
+        const iTermLABColor c3 = lerp_lab(r / 5, base8_lab[6], fg_lab);
+
+        for (CGFloat g = 0; g < 6; g += 1.0) {
+            const iTermLABColor c4 = lerp_lab(g / 5, c0, c1);
+            const iTermLABColor c5 = lerp_lab(g / 5, c2, c3);
+
+            for (CGFloat b = 0; b < 6.0; b += 1.0) {
+                const iTermLABColor c6 = lerp_lab(b / 5, c4, c5);
+                NSColor *color = labToRGB(c6);
+                [colorMap setColor:color forKey:di];
+                di += 1;
+            }
+        }
+    }
+    for (CGFloat i = 0; i < 24; i += 1.0) {
+        const CGFloat t = (i + 1) / 25.0;
+        iTermLABColor lab = lerp_lab(t, bg_lab, fg_lab);
+        NSColor *color = labToRGB(lab);
+        [colorMap setColor:color forKey:di];
+        di += 1;
+    }
+}
+
+- (void)setStandard256ColorsInColorMap:(iTermColorMap *)colorMap {
+    for (int i = 16; i < 256; i++) {
+        NSColor *theColor = [NSColor colorForAnsi256ColorIndex:i];
+        [colorMap setColor:theColor forKey:kColorMap8bitBase + i];
+    }
+}
+
+- (void)setColorsFromDictionary:(NSDictionary<NSNumber *, id> *)dict harmonize:(BOOL)harmonize {
     [self mutateColorMap:^(iTermColorMap *colorMap) {
+        colorMap.harmonize = harmonize;
         [dict enumerateKeysAndObjectsUsingBlock:^(NSNumber * _Nonnull key, id  _Nonnull obj, BOOL * _Nonnull stop) {
             if ([obj isKindOfClass:[NSNull class]]) {
                 [colorMap setColor:nil forKey:key.intValue];
@@ -4727,7 +4832,7 @@ lengthExcludingInBandSignaling:data.length
     for (int i = 16; i < limit; i++) {
         dict[@(kColorMap8bitBase + i)] = slot.indexedColors[i] ?: [NSNull null];
     }
-    [self setColorsFromDictionary:dict];
+    [self setColorsFromDictionary:dict harmonize:self.colorMap.harmonize];
     // Pause so that HTML logging gets an up-to-date colormap before the next token.
     // Unmanaged because it will set the profile and this avoids reentrant syncs/joined side effects.
     [self addUnmanagedPausedSideEffect:^(id<VT100ScreenDelegate>  _Nonnull delegate,
@@ -5323,7 +5428,7 @@ lengthExcludingInBandSignaling:data.length
     if (colorData) {
         VT100SavedColorsSlot *slot = [VT100SavedColorsSlot fromData:colorData];
         if (slot) {
-            [self setColorsFromDictionary:slot.indexedColorsDictionary];
+            [self setColorsFromDictionary:slot.indexedColorsDictionary harmonize:self.colorMap.harmonize];
         }
     }
     NSArray *tabStopsArray = [NSArray castFrom:terminalState[VT100ScreenTerminalStateKeyTabStops]];
@@ -6003,8 +6108,7 @@ launchCoprocessWithCommand:(NSString *)command
                                                        self.width,
                                                        self.height - gridRow)
                               downBy:1
-                           softBreak:NO
-                            fillChar:(screen_char_t){0}];
+                           softBreak:NO];
         range.start.y += 1;
         range.end.y += 1;
     }

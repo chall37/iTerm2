@@ -390,7 +390,7 @@ lengthExcludingInBandSignaling:(int)lengthExcludingInBandSignaling
 - (void)loadInitialColorTable;
 - (void)setColor:(NSColor *)color forKey:(int)key;
 - (void)restoreColorsFromSlot:(VT100SavedColorsSlot *)slot;
-- (void)setColorsFromDictionary:(NSDictionary<NSNumber *, id> *)dict;
+- (void)setColorsFromDictionary:(NSDictionary<NSNumber *, id> *)dict harmonize:(BOOL)harmonize;
 
 // This is the only safe way to modify the color map. Call it from the mutation thread.
 - (void)mutateColorMap:(void (^)(iTermColorMap *colorMap))block;

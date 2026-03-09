@@ -93,6 +93,7 @@
 #define KEY_BOLD_COLOR             @"Bold Color"
 #define KEY_USE_BOLD_COLOR         @"Use Bright Bold"  // Pre-3.3.7: Means "use the specified bold color, and also use the bright version of dark ansi colors". Post-3.3.7: Use the specified bold color
 #define KEY_BRIGHTEN_BOLD_TEXT     @"Brighten Bold Text"  // New in 3.3.7.
+#define KEY_HARMONIZE_256_COLORS   @"Harmonize 256 Colors"
 #define KEY_LINK_COLOR             @"Link Color"
 #define KEY_MATCH_COLOR            @"Match Background Color"
 #define KEY_SELECTION_COLOR        @"Selection Color"
@@ -284,6 +285,7 @@ extern NSString *const iTermProgressBarColorSchemeOrange;
 #define KEY_LOGGING_STYLE                     @"Plain Text Logging"  // Formerly a boolean (false=raw, true=text) now an integer (iTermLoggingStyle)
 #define KEY_OPEN_PASSWORD_MANAGER_AUTOMATICALLY @"Open Password Manager Automatically"
 #define KEY_DEFAULT_PANE_LOCKED               @"Default Pane Locked"
+#define KEY_BUFFER_BY_DEFAULT                 @"Buffer Input by Default"
 
 // NOTE: KEY_SHOW_TIMESTAMPS was the original value. It is no longer used, and we just keep it around for migration to the new settings.
 #define KEY_SHOW_TIMESTAMPS                   @"Show Timestamps"  // NSNumber iTermTimestampsMode
@@ -552,10 +554,28 @@ static inline iTermLoggingStyle iTermLoggingStyleFromUserDefaultsValue(NSUIntege
 }
 
 typedef NS_ENUM(NSInteger, iTermTriggerMatchType) {
+    // Regex-based (0-99)
     iTermTriggerMatchTypeRegex = 0,
     iTermTriggerMatchTypeURLRegex = 1,
-    iTermTriggerMatchTypePageContentRegex = 2
+    iTermTriggerMatchTypePageContentRegex = 2,
+
+    // Event-based (100+)
+    iTermTriggerMatchTypeEventPromptDetected = 100,
+    iTermTriggerMatchTypeEventCommandFinished = 101,
+    iTermTriggerMatchTypeEventDirectoryChanged = 102,
+    iTermTriggerMatchTypeEventHostChanged = 103,
+    iTermTriggerMatchTypeEventUserChanged = 104,
+    iTermTriggerMatchTypeEventIdle = 105,
+    iTermTriggerMatchTypeEventActivityAfterIdle = 106,
+    iTermTriggerMatchTypeEventSessionEnded = 107,
+    iTermTriggerMatchTypeEventBellReceived = 108,
+    iTermTriggerMatchTypeEventLongRunningCommand = 109,
+    iTermTriggerMatchTypeEventCustomEscapeSequence = 110
 };
+
+static inline BOOL iTermTriggerMatchTypeIsEvent(iTermTriggerMatchType type) {
+    return type >= 100;
+}
 
 typedef struct {
     double width;

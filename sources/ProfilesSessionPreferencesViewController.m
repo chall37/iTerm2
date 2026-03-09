@@ -29,6 +29,9 @@
 #import "NSView+iTerm.h"
 #import "PSMMinimalTabStyle.h"
 #import "PreferencePanel.h"
+#import "Trigger.h"
+
+#import "iTerm2SharedARC-Swift.h"
 
 static NSString *const ProfilesSessionPreferencesViewControllerPhonyShortLivedSessionsKey = @"ProfilesSessionPreferencesViewControllerPhonyShortLivedSessionsKey";
 
@@ -98,6 +101,8 @@ static NSString *const ProfilesSessionPreferencesViewControllerPhonyShortLivedSe
     IBOutlet NSPopUpButton *_progressBarColorScheme;
 
     IBOutlet NSButton *_defaultPaneLocked;
+    IBOutlet NSButton *_bufferByDefault;
+    IBOutlet NSTextField *_bufferWarning;
 
     iTermStatusBarSetupViewController *_statusBarSetupViewController;
     iTermStatusBarSetupPanel *_statusBarSetupWindow;
@@ -238,7 +243,7 @@ static NSString *const ProfilesSessionPreferencesViewControllerPhonyShortLivedSe
         if (!strongSelf) {
             return;
         }
-        BOOL isOn = [sender state] == NSControlStateValueOn;
+        BOOL isOn = [(NSButton *)sender state] == NSControlStateValueOn;
         if (isOn) {
             static NSString *const kWarnAboutSendCodeWhenIdle = @"NoSyncWarnAboutSendCodeWhenIdle";
             // This stupid feature was inherited from iTerm 0.1. It doesn't work because people
@@ -304,6 +309,14 @@ static NSString *const ProfilesSessionPreferencesViewControllerPhonyShortLivedSe
             return;
         }
         DLog(@"Default pane locked changed to: %@", @(strongSelf->_defaultPaneLocked.state));
+    };
+
+    info = [self defineControl:_bufferByDefault
+                           key:KEY_BUFFER_BY_DEFAULT
+                   relatedView:nil
+                          type:kPreferenceInfoTypeCheckbox];
+    info.observer = ^{
+        [weakSelf updateBufferWarning];
     };
 
     info = [self defineControl:_statusBarEnabled
@@ -463,6 +476,28 @@ static NSString *const ProfilesSessionPreferencesViewControllerPhonyShortLivedSe
     }
 }
 
+- (void)updateBufferWarning {
+    _bufferWarning.hidden = !([self boolForKey:KEY_BUFFER_BY_DEFAULT] && ![self hasUnbufferTrigger]);
+}
+
+- (BOOL)hasUnbufferTrigger {
+    NSArray *triggers = [NSArray castFrom:[self objectForKey:KEY_TRIGGERS]];
+    if (!triggers) {
+        return NO;
+    }
+    return [triggers anyWithBlock:^BOOL(id obj) {
+        NSDictionary *dict = [NSDictionary castFrom:obj];
+        if (!dict) {
+            return NO;
+        }
+        iTermBufferInputTrigger *trigger = [iTermBufferInputTrigger castFrom:[Trigger triggerFromUntrustedDict:dict]];
+        if (!trigger) {
+            return NO;
+        }
+        return !trigger.shouldBuffer;
+    }];
+}
+
 - (void)onEndSettingDidChange {
     [self setUnsignedInteger:_onEndAction.selectedTag forKey:KEY_SESSION_END_ACTION];
 }
@@ -481,7 +516,9 @@ static NSString *const ProfilesSessionPreferencesViewControllerPhonyShortLivedSe
                                  _logFilenameFormat,
                                  _changeLogDir,
                                  _archive,
-                                 _archiveDir ];
+                                 _archiveDir,
+                                 _defaultPaneLocked,
+                                 _bufferByDefault ];
     for (id view in viewsToDisable) {
         [view setEnabled:NO];
     }
@@ -490,6 +527,8 @@ static NSString *const ProfilesSessionPreferencesViewControllerPhonyShortLivedSe
     [self infoForControl:_logDir].observer = NULL;
     [self infoForControl:_archive].observer = NULL;
     [self infoForControl:_archiveDir].observer = NULL;
+    [self infoForControl:_bufferByDefault].observer = NULL;
+
     [self updateStatusBarSettingsEnabled];
 }
 
@@ -504,6 +543,7 @@ static NSString *const ProfilesSessionPreferencesViewControllerPhonyShortLivedSe
     [_jobsTable reloadData];
     [self updateRemoveJobButtonEnabled];
     [self updateStatusBarSettingsEnabled];
+    [self updateBufferWarning];
     if (_awoken) {
         [self updateNonDefaultIndicatorVisibleForInfo:[self infoForControl:_logFilenameFormat]];
     }
@@ -742,6 +782,7 @@ static NSString *const ProfilesSessionPreferencesViewControllerPhonyShortLivedSe
 
 - (void)reloadProfiles {
     [_jobsTable reloadData];
+    [self updateBufferWarning];
 }
 
 #pragma mark - Archive Directory

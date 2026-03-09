@@ -82,6 +82,7 @@ extern const int kColorMap24bitBase;
 @property(nonatomic, readonly) BOOL darkMode;
 @property(nonatomic, readonly) NSInteger generation;
 @property(nonatomic, readonly) CGFloat faintTextAlpha;
+@property(nonatomic, readonly) BOOL harmonize;
 
 - (NSColor *)colorForKey:(iTermColorMapKey)theKey;
 - (vector_float4)fastColorForKey:(iTermColorMapKey)theKey;
@@ -149,6 +150,7 @@ extern const int kColorMap24bitBase;
 @property(nonatomic, assign) BOOL darkMode;
 @property(nonatomic, readonly) id<iTermColorMapReading> sanitizingAdapter;
 @property(nonatomic, assign) CGFloat faintTextAlpha;
+@property(nonatomic, assign) BOOL harmonize;
 
 + (iTermColorMapKey)keyFor8bitRed:(int)red
                             green:(int)green

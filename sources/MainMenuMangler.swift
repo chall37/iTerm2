@@ -14,9 +14,12 @@ class MainMenuMangler: NSObject {
     private weak var observedWindow: NSWindow?
     private var web: NSMenuItem?
 
+    // Track if the application is terminating to avoid accessing deallocated objects
+    private var isTerminating = false
+
     // Store original key equivalents for web menu items
     private var originalWebKeyEquivalents: [(String, NSEvent.ModifierFlags)] = []
-    
+
     // Store conflicting menu items that need their key equivalents restored
     private var conflictingMenuItems: [(menuItem: NSMenuItem, keyEquivalent: String, modifierMask: NSEvent.ModifierFlags)] = []
 
@@ -44,6 +47,7 @@ class MainMenuMangler: NSObject {
         "New Window": "plus",
         "New Window with Current Profile": "plus.app",
         "New Tab": "plus.rectangle.on.folder",
+        "New Tab Next to Current Tab": "arrow.forward.folder.fill",
         "New Tab with Current Profile": "plus.rectangle.on.folder.fill",
         "Duplicate Tab": "document.on.document",
         "Duplicate Window": "document.on.document.fill",
@@ -68,6 +72,8 @@ class MainMenuMangler: NSObject {
         "Broadcast Input.Broadcast Input to All Panes in Current Tab": "dot.radiowaves.right",
         "Broadcast Input.Toggle Broadcast Input to Current Session": "dot.radiowaves.right",
         "Broadcast Input.Show Background Pattern Indicator": "dot.radiowaves.up.forward",
+        "Broadcast Input.Current Session is Broadcast Source": "dot.radiowaves.left.and.right",
+        "Toggle Buffer Input": "pause.circle",
         "tmux.Dashboard": "rectangle.grid.2x2",
         "tmux.Detach": "arrow.up.right.square",
         "tmux.Force Detach": "bolt.slash",
@@ -145,6 +151,7 @@ class MainMenuMangler: NSObject {
         "Clear to Last Mark": "bookmark",
         "Clear Scrollback Buffer": "xmark.diamond",
         "Fold Selected Lines": "text.line.first.and.arrowtriangle.forward",
+        "Fold All Above Cursor": "text.line.first.and.arrowtriangle.forward",
 
         // View menu
         "Show Tabs in Fullscreen": "macwindow",
@@ -164,6 +171,7 @@ class MainMenuMangler: NSObject {
         "Make Text Normal Size": "textformat.size",
         "Start Instant Replay": "restart.circle",
         "Clear Instant Replay": "xmark.circle",
+        "Always Show Alerts with Remembered Selections": "bell.badge",
         "Pin Hotkey Window": "pin.fill",
         "Render Selection Natively": "square.dashed",
         "Replace Selection.Replace with Pretty-Printed JSON": "curlybraces.square",
@@ -255,7 +263,7 @@ class MainMenuMangler: NSObject {
         "Edit Tab Title": "pencil",
         "Edit Window Title": "pencil",
         // Window Style removed - no identifier in XIB
-        // Move Tab to New Window removed - no identifier in XIB
+        "Move Tab to New Window": "arrow.forward.folder.fill",
         "Merge All Windows": "macwindow.stack",
         "Arrange Split Panes Evenly": "rectangle.split.2x1",
         "Arrange Windows Horizontally": "square.split.2x1",
@@ -275,6 +283,8 @@ class MainMenuMangler: NSObject {
         "Window Style.Maximized": "rectangle.fill",
         "Window Style.Full Screen": "arrow.up.left.and.arrow.down.right",
         "Window Style.No Title Bar": "rectangle.dashed",
+        "Window Style.Centered": "inset.filled.center.rectangle",
+        "Lock Size": "lock",
         "Save Window Arrangement": "square.and.arrow.down",
         "Save Current Window as Arrangement": "square.and.arrow.down",
         "Load Arrangement from File…": "doc.badge.arrow.up",
@@ -400,7 +410,18 @@ class MainMenuMangler: NSObject {
             selector: #selector(browserStateDidChange(_:)),
             name: iTermBrowserGateway.didChange,
             object: nil)
+        // Stop observing before iTermController is released during app termination
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applicationWillTerminate(_:)),
+            name: Notification.Name(rawValue: iTermApplicationWillTerminate),
+            object: nil)
         update()
+    }
+
+    @objc private func applicationWillTerminate(_ note: Notification) {
+        isTerminating = true
+        stopObserving()
     }
 
     @objc private func browserStateDidChange(_ note: Notification) {
@@ -422,6 +443,9 @@ class MainMenuMangler: NSObject {
     }
 
     private func update() {
+        // Don't access iTermController during app termination - it may be deallocated
+        guard !isTerminating else { return }
+
         let currentTerminalWindow = iTermController.sharedInstance().currentTerminal?.window()
         if currentTerminalWindow == observedWindow {
             return
@@ -555,6 +579,9 @@ class MainMenuMangler: NSObject {
     }
 
     func updateMainMenu() {
+        // Don't access iTermController during app termination - it may be deallocated
+        guard !isTerminating else { return }
+
         guard let web else {
             DLog("updateMainMenu: web is nil, returning early")
             return

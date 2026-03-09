@@ -74,6 +74,7 @@ static NSString * const kColorGalleryURL = @"https://www.iterm2.com/colorgallery
     IBOutlet iTermSettingsColorWell *_underlineColor;
     IBOutlet iTermSettingsColorWell *_badgeColor;
 
+    IBOutlet NSButton *_harmonize256;
     IBOutlet NSTextField *_ansi0ColorLabel;
     IBOutlet NSTextField *_ansi1ColorLabel;
     IBOutlet NSTextField *_ansi2ColorLabel;
@@ -311,6 +312,11 @@ static NSString * const kColorGalleryURL = @"https://www.iterm2.com/colorgallery
                    displayName:@"Color presets"
                        phrases:@[]
                            key:nil];
+
+    [self defineControl:_harmonize256
+                    key:KEY_HARMONIZE_256_COLORS
+            relatedView:nil
+                   type:kPreferenceInfoTypeCheckbox];
 
     [self maybeWarnAboutExcessiveContrast];
     [self updateColorControlsEnabled];

@@ -469,6 +469,9 @@ static BOOL hasBecomeActive = NO;
     } else if (menuItem.action == @selector(debugLogging:)) {
         menuItem.state = gDebugLogging ? NSControlStateValueOn : NSControlStateValueOff;
         return YES;
+    } else if (menuItem.action == @selector(toggleShowAlertsWithRememberedSelections:)) {
+        menuItem.state = gShowRememberedAlerts ? NSControlStateValueOn : NSControlStateValueOff;
+        return YES;
     } else if (menuItem.action == @selector(arrangeSplitPanesEvenly:)) {
         PTYTab *tab = [[[iTermController sharedInstance] currentTerminal] currentTab];
         return (tab.sessions.count > 0 && !tab.isMaximized);
@@ -479,14 +482,7 @@ static BOOL hasBecomeActive = NO;
                menuItem.action == @selector(newTmuxTab:)) {
         return [[TmuxControllerRegistry sharedInstance] numberOfClients];
     } else if (menuItem.action == @selector(toggleTriggerEnabled:)) {
-        // For some dumb reason this menu item doesn't know how to check the responder chain properly.
-        NSResponder *realResponder = [self firstResponderForMenuItem:menuItem];
-        if (!realResponder) {
-            return NO;
-        }
-        if ([realResponder respondsToSelector:@selector(validateMenuItem:)]) {
-            return [realResponder validateMenuItem:menuItem];
-        }
+        // The menu is only populated when there's a current session, so this is always valid.
         return YES;
     } else if (menuItem.action == @selector(toggleDisableTransparencyForActiveWindow:)) {
         const BOOL value = [iTermPreferences boolForKey:kPreferenceKeyDisableTransparencyForKeyWindow];
@@ -2703,6 +2699,10 @@ static iTermKeyEventReplayer *gReplayer;
 
 - (IBAction)debugLogging:(id)sender {
     ToggleDebugLogging();
+}
+
+- (IBAction)toggleShowAlertsWithRememberedSelections:(id)sender {
+    [iTermWarning toggleShowRememberedAlerts];
 }
 
 - (IBAction)openQuickly:(id)sender {

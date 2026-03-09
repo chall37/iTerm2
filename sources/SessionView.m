@@ -896,7 +896,7 @@ NSString *const SessionViewWasSelectedForInspectionNotification = @"SessionViewW
     [self metalViewVisibilityDidChange];
 }
 
-- (void)setMetalViewNeedsDisplayInTextViewRect:(NSRect)textViewRect NS_AVAILABLE_MAC(10_11) {
+- (void)requestRedraw {
     if (_useMetal) {
         // TODO: Would be nice to draw only the rect, but I don't see a way to do that with iTermMTKView
         // that doesn't involve doing something nutty like saving a copy of the drawable.
